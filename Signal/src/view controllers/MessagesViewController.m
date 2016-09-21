@@ -17,6 +17,7 @@
 #import "NewGroupViewController.h"
 #import "OWSCall.h"
 #import "OWSCallCollectionViewCell.h"
+#import "OWSContactInfoTableViewController.h"
 #import "OWSContactsManager.h"
 #import "OWSDisplayedMessageCollectionViewCell.h"
 #import "OWSErrorMessage.h"
@@ -50,7 +51,9 @@
 #import <JSQSystemSoundPlayer.h>
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <SignalServiceKit/MimeTypeUtil.h>
+#import <SignalServiceKit/OWSDisappearingMessagesConfiguration.h>
 #import <SignalServiceKit/OWSFingerprint.h>
+#import <SignalServiceKit/OWSFingerprintBuilder.h>
 #import <SignalServiceKit/SignalRecipient.h>
 #import <SignalServiceKit/TSAccountManager.h>
 #import <YapDatabase/YapDatabaseView.h>
@@ -65,9 +68,11 @@
 #define JSQ_IMAGE_INSET 5
 
 static NSTimeInterval const kTSMessageSentDateShowTimeInterval = 5 * 60;
-static NSString *const kUpdateGroupSegueIdentifier             = @"updateGroupSegue";
-static NSString *const kFingerprintSegueIdentifier             = @"fingerprintSegue";
-static NSString *const kShowGroupMembersSegue                  = @"showGroupMembersSegue";
+static NSString *const OWSMessagesViewControllerSegueUpdateGroup = @"updateGroupSegue";
+static NSString *const OWSMessagesViewControllerSegueShowFingerprint = @"fingerprintSegue";
+static NSString *const OWSMessagesViewControllerSegueShowGroupMembers = @"showGroupMembersSegue";
+static NSString *const OWSMessagesViewControllerSeguePushConversationSettings =
+    @"OWSMessagesViewControllerSeguePushConversationSettings";
 
 typedef enum : NSUInteger {
     kMediaTypePicture,
@@ -85,24 +90,24 @@ typedef enum : NSUInteger {
 }
 
 @property TSThread *thread;
-@property (nonatomic, weak) UIView *navView;
+@property TSMessage *lastDeliveredMessage;
 @property (nonatomic, strong) YapDatabaseConnection *editingDatabaseConnection;
 @property (nonatomic, strong) YapDatabaseConnection *uiDatabaseConnection;
 @property (nonatomic, strong) YapDatabaseViewMappings *messageMappings;
+
 @property (nonatomic, retain) JSQMessagesBubbleImage *outgoingBubbleImageData;
 @property (nonatomic, retain) JSQMessagesBubbleImage *incomingBubbleImageData;
 @property (nonatomic, retain) JSQMessagesBubbleImage *currentlyOutgoingBubbleImageData;
 @property (nonatomic, retain) JSQMessagesBubbleImage *outgoingMessageFailedImageData;
+
 @property (nonatomic, strong) NSTimer *audioPlayerPoller;
 @property (nonatomic, strong) TSVideoAttachmentAdapter *currentMediaAdapter;
 
 @property (nonatomic, retain) NSTimer *readTimer;
+@property (nonatomic, strong) UILabel *navbarTitleLabel;
 @property (nonatomic, retain) UIButton *attachButton;
-
 @property (nonatomic, retain) NSIndexPath *lastDeliveredMessageIndexPath;
-@property (nonatomic, retain) UIGestureRecognizer *showFingerprintGesture;
-@property (nonatomic, retain) UITapGestureRecognizer *toggleContactPhoneGesture;
-@property (nonatomic) BOOL displayPhoneAsTitle;
+@property NSMutableDictionary<NSIndexPath *, NSTimer *> *disappearingMessagesAnimationTimers;
 
 @property NSUInteger page;
 @property (nonatomic) BOOL composeOnOpen;
@@ -112,11 +117,6 @@ typedef enum : NSUInteger {
 @property (nonatomic, readonly) OWSContactsManager *contactsManager;
 @property NSCache *messageAdapterCache;
 
-@end
-
-@interface UINavigationItem () {
-    UIView *backButtonView;
-}
 @end
 
 @implementation MessagesViewController
@@ -216,13 +216,6 @@ typedef enum : NSUInteger {
     [self.navigationController.navigationBar setTranslucent:NO];
 
     self.messageAdapterCache = [[NSCache alloc] init];
-
-    self.showFingerprintGesture =
-        [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(showFingerprint)];
-
-    self.toggleContactPhoneGesture =
-        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(toggleContactPhone)];
-
     _attachButton = [[UIButton alloc] init];
     [_attachButton setFrame:CGRectMake(0,
                                        0,
@@ -247,6 +240,11 @@ typedef enum : NSUInteger {
     self.senderDisplayName = ME_MESSAGE_IDENTIFIER;
 
     [self initializeToolbars];
+}
+
+- (void)didMoveToParentViewController:(UIViewController *)parent
+{
+    [self setupTitleLabelGestureRecognizer];
 }
 
 - (void)registerCustomMessageNibs
@@ -331,8 +329,6 @@ typedef enum : NSUInteger {
     [self dismissKeyBoard];
     [self startReadTimer];
 
-    [self initializeTitleLabelGestureRecognizer];
-
     // TODO prep this sync one time before view loads so we don't have to repaint.
     [self updateBackButtonAsync];
 
@@ -374,12 +370,11 @@ typedef enum : NSUInteger {
     JSQMessagesCollectionView *collectionView = self.collectionView;
     NSInteger num_bubbles                     = [self collectionView:collectionView numberOfItemsInSection:0];
     for (NSInteger i = 0; i < num_bubbles; i++) {
-        NSIndexPath *index_path = [NSIndexPath indexPathForRow:i inSection:0];
-        TSMessageAdapter *msgAdapter =
-            [collectionView.dataSource collectionView:collectionView messageDataForItemAtIndexPath:index_path];
-        if (msgAdapter.messageType == TSIncomingMessageAdapter && msgAdapter.isMediaMessage &&
-            [msgAdapter isKindOfClass:[TSVideoAttachmentAdapter class]]) {
-            TSVideoAttachmentAdapter *msgMedia = (TSVideoAttachmentAdapter *)[msgAdapter media];
+        NSIndexPath *indexPath = [NSIndexPath indexPathForRow:i inSection:0];
+        id<OWSMessageData> message = [self messageAtIndexPath:indexPath];
+        if (message.messageType == TSIncomingMessageAdapter && message.isMediaMessage &&
+            [message isKindOfClass:[TSVideoAttachmentAdapter class]]) {
+            TSVideoAttachmentAdapter *msgMedia = (TSVideoAttachmentAdapter *)message.media;
             if ([msgMedia isAudio]) {
                 msgMedia.isPaused       = NO;
                 msgMedia.isAudioPlaying = NO;
@@ -390,7 +385,6 @@ typedef enum : NSUInteger {
     }
 
     [self cancelReadTimer];
-    [self removeTitleLabelGestureRecognizer];
     [self saveDraft];
 }
 
@@ -401,7 +395,7 @@ typedef enum : NSUInteger {
 
 #pragma mark - Initiliazers
 
-
+// Group update menu
 - (IBAction)didSelectShow:(id)sender {
     if (isGroupConversation) {
         UIBarButtonItem *spaceEdge =
@@ -491,13 +485,14 @@ typedef enum : NSUInteger {
     }
 }
 
-- (void)setNavigationTitle {
+- (void)setNavigationTitle
+{
     NSString *navTitle = self.thread.name;
     if (isGroupConversation && [navTitle length] == 0) {
         navTitle = NSLocalizedString(@"NEW_GROUP_DEFAULT_TITLE", @"");
     }
     self.navController.activeNavigationBarTitle = nil;
-    self.title                                  = navTitle;
+    self.title = navTitle;
 }
 
 - (void)initializeToolbars
@@ -536,47 +531,44 @@ typedef enum : NSUInteger {
     [self setNavigationTitle];
 }
 
-- (void)initializeTitleLabelGestureRecognizer {
-    if (isGroupConversation) {
+- (void)setupTitleLabelGestureRecognizer
+{
+    // Called on load/unload, but we only want to init once.
+    if (self.navbarTitleLabel) {
         return;
     }
 
+    UILabel *navbarTitleLabel = [self findNavbarTitleLabel];
+    if (!navbarTitleLabel) {
+        DDLogError(@"%@ Unable to find navbar title label. Skipping gesture recognition", self.tag);
+        return;
+    }
+
+    self.navbarTitleLabel = navbarTitleLabel;
+    navbarTitleLabel.userInteractionEnabled = YES;
+    navbarTitleLabel.superview.userInteractionEnabled = YES;
+
+    UITapGestureRecognizer *titleTapRecognizer =
+        [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(didTapTitle)];
+    [navbarTitleLabel addGestureRecognizer:titleTapRecognizer];
+}
+
+- (nullable UILabel *)findNavbarTitleLabel
+{
     for (UIView *view in self.navigationController.navigationBar.subviews) {
         if ([view isKindOfClass:NSClassFromString(@"UINavigationItemView")]) {
-            self.navView = view;
-            for (UIView *aView in self.navView.subviews) {
+            UIView *navItemView = view;
+            for (UIView *aView in navItemView.subviews) {
                 if ([aView isKindOfClass:[UILabel class]]) {
                     UILabel *label = (UILabel *)aView;
                     if ([label.text isEqualToString:self.title]) {
-                        [self.navView setUserInteractionEnabled:YES];
-                        [aView setUserInteractionEnabled:YES];
-                        [aView addGestureRecognizer:self.showFingerprintGesture];
-                        [aView addGestureRecognizer:self.toggleContactPhoneGesture];
-                        return;
+                        return label;
                     }
                 }
             }
         }
     }
-}
-
-- (void)removeTitleLabelGestureRecognizer {
-    if (isGroupConversation) {
-        return;
-    }
-
-    for (UIView *aView in self.navView.subviews) {
-        if ([aView isKindOfClass:[UILabel class]]) {
-            UILabel *label = (UILabel *)aView;
-            if ([label.text isEqualToString:self.title]) {
-                [self.navView setUserInteractionEnabled:NO];
-                [aView setUserInteractionEnabled:NO];
-                [aView removeGestureRecognizer:self.showFingerprintGesture];
-                [aView removeGestureRecognizer:self.toggleContactPhoneGesture];
-                return;
-            }
-        }
-    }
+    return nil;
 }
 
 // Overiding JSQMVC layout defaults
@@ -610,30 +602,19 @@ typedef enum : NSUInteger {
 
 #pragma mark - Fingerprints
 
-- (void)showFingerprint
-{
-    // Show fingerprint for their most recently accepted identity
-    NSString *theirSignalId = self.thread.contactIdentifier;
-    NSData *theirIdentityKey = [self.storageManager identityKeyForRecipientId:theirSignalId];
-    [self showFingerprintWithTheirIdentityKey:theirIdentityKey theirSignalId:theirSignalId];
-}
-
 - (void)showFingerprintWithTheirIdentityKey:(NSData *)theirIdentityKey theirSignalId:(NSString *)theirSignalId
 {
-    NSString *mySignalId = [self.storageManager localNumber];
-    NSData *myIdentityKey = [self.storageManager identityKeyPair].publicKey;
-    OWSFingerprint *fingerprint = [OWSFingerprint fingerprintWithMyStableId:mySignalId
-                                                              myIdentityKey:myIdentityKey
-                                                              theirStableId:theirSignalId
-                                                           theirIdentityKey:theirIdentityKey];
-
+    OWSFingerprintBuilder *builder = [[OWSFingerprintBuilder alloc] initWithStorageManager:self.storageManager];
+    OWSFingerprint *fingerprint =
+        [builder fingerprintWithTheirSignalId:self.thread.contactIdentifier theirIdentityKey:theirIdentityKey];
     [self markAllMessagesAsRead];
-    [self performSegueWithIdentifier:kFingerprintSegueIdentifier sender:fingerprint];
+    [self performSegueWithIdentifier:OWSMessagesViewControllerSegueShowFingerprint sender:fingerprint];
 }
 
-
+// TODO deprecated. Move this functionality into conversation settings controller.
 - (void)toggleContactPhone {
-    _displayPhoneAsTitle = !_displayPhoneAsTitle;
+    // disabled since we're going to settings.
+    //    _displayPhoneAsTitle = !_displayPhoneAsTitle;
 
     if (!_thread.isGroupThread) {
         Contact *contact = [self.contactsManager latestContactForPhoneNumber:[self phoneNumberForThread]];
@@ -705,17 +686,12 @@ typedef enum : NSUInteger {
         }
     }
 
-    if (_displayPhoneAsTitle) {
-        self.title = [PhoneNumber
-            bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:[[self phoneNumberForThread] toE164]];
-    } else {
-        [self setNavigationTitle];
-    }
+    [self setNavigationTitle];
 }
 
 - (void)showGroupMembers {
     [self.navController hideDropDown:self];
-    [self performSegueWithIdentifier:kShowGroupMembersSegue sender:self];
+    [self performSegueWithIdentifier:OWSMessagesViewControllerSegueShowGroupMembers sender:self];
 }
 
 #pragma mark - Calls
@@ -763,11 +739,29 @@ typedef enum : NSUInteger {
     if (text.length > 0) {
         [JSQSystemSoundPlayer jsq_playMessageSentSound];
 
-        TSOutgoingMessage *message = [[TSOutgoingMessage alloc] initWithTimestamp:[NSDate ows_millisecondTimeStamp]
-                                                                         inThread:self.thread
-                                                                      messageBody:text];
+        TSOutgoingMessage *message;
+        OWSDisappearingMessagesConfiguration *configuration =
+            [OWSDisappearingMessagesConfiguration fetchObjectWithUniqueID:self.thread.uniqueId];
+        if (configuration.isEnabled) {
+            message = [[TSOutgoingMessage alloc] initWithTimestamp:[NSDate ows_millisecondTimeStamp]
+                                                          inThread:self.thread
+                                                       messageBody:text
+                                                     attachmentIds:@[]
+                                                         expiresIn:configuration.durationSeconds];
+        } else {
+            message = [[TSOutgoingMessage alloc] initWithTimestamp:[NSDate ows_millisecondTimeStamp]
+                                                          inThread:self.thread
+                                                       messageBody:text];
+        }
 
-        [[TSMessagesManager sharedManager] sendMessage:message inThread:self.thread success:nil failure:nil];
+        [[TSMessagesManager sharedManager] sendMessage:message
+            inThread:self.thread
+            success:^{
+                self.lastDeliveredMessage = message;
+            }
+            failure:^{
+                DDLogWarn(@"%@ Failed to deliver message.", self.tag);
+            }];
         [self finishSendingMessage];
     }
 }
@@ -789,7 +783,7 @@ typedef enum : NSUInteger {
 
 #pragma mark - JSQMessages CollectionView DataSource
 
-- (id<JSQMessageData>)collectionView:(JSQMessagesCollectionView *)collectionView
+- (id<OWSMessageData>)collectionView:(JSQMessagesCollectionView *)collectionView
        messageDataForItemAtIndexPath:(NSIndexPath *)indexPath
 {
     return [self messageAtIndexPath:indexPath];
@@ -825,7 +819,7 @@ typedef enum : NSUInteger {
 - (UICollectionViewCell *)collectionView:(JSQMessagesCollectionView *)collectionView
                   cellForItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    TSMessageAdapter *message = [self messageAtIndexPath:indexPath];
+    id<OWSMessageData> message = [self messageAtIndexPath:indexPath];
     NSParameterAssert(message != nil);
 
     JSQMessagesCollectionViewCell *cell;
@@ -860,7 +854,7 @@ typedef enum : NSUInteger {
 
 #pragma mark - Loading message cells
 
-- (JSQMessagesCollectionViewCell *)loadIncomingMessageCellForMessage:(id<JSQMessageData>)message
+- (JSQMessagesCollectionViewCell *)loadIncomingMessageCellForMessage:(id<OWSMessageData>)message
                                                          atIndexPath:(NSIndexPath *)indexPath
 {
     JSQMessagesCollectionViewCell *cell =
@@ -876,7 +870,7 @@ typedef enum : NSUInteger {
     return cell;
 }
 
-- (JSQMessagesCollectionViewCell *)loadOutgoingCellForMessage:(id<JSQMessageData>)message
+- (JSQMessagesCollectionViewCell *)loadOutgoingCellForMessage:(id<OWSMessageData>)message
                                                   atIndexPath:(NSIndexPath *)indexPath
 {
     JSQMessagesCollectionViewCell *cell =
@@ -888,6 +882,42 @@ typedef enum : NSUInteger {
             NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle | NSUnderlinePatternSolid)
         };
     }
+
+    //    if (![message isKindOfClass:[TSMessageAdapter class]]) {
+    //        DDLogError(@"%@ unexpected message for outoing cell: %@", self.tag, message);
+    //        return cell;
+    //    }
+    //    TSMessageAdapter *adapter = (TSMessageAdapter *)message;
+    //
+    //    if (![adapter.interaction isKindOfClass:[TSOutgoingMessage class]]) {
+    //        DDLogError(@"%@ unexpected interaction for outoing cell: %@", self.tag, adapter.interaction);
+    //        return cell;
+    //    }
+    //    TSOutgoingMessage *outgoingMessage = (TSOutgoingMessage *)adapter.interaction;
+    //
+    //    if (outgoingMessage.isExpiringMessage) {
+    //        CGRect originalFrame = cell.cellBottomLabel.frame;
+    //////        CGRect newFrame = CGRectOffset(originalFrame, -20, 0);
+    ////
+    ////        CGRect newFrame = CGRectMake(0, 0, origa)
+    ////        cell.cellBottomLabel.frame = newFrame;
+    //
+    //        UIImage *image = [UIImage imageNamed:@"warning_white"];
+    //        UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
+    ////        imageView.frame = CGRectMake(newFrame.origin.x + newFrame.size.width, newFrame.origin.y, 32, 32);
+    //        imageView.frame = originalFrame;
+    //        [cell.cellBottomLabel.superview insertSubview:imageView aboveSubview:cell.cellBottomLabel];
+    //
+    //        // FIXME to do.
+    //        // UIImage *image = [UIImage animatedImageNamed:@"expiration_hourglass" duration:message.expirationTime]
+    ////        NSTextAttachment *expiringTimerAttachment = [NSTextAttachment new];
+    ////        expiringTimerAttachment.image = [UIImage imageNamed:@"warning_white"];
+    ////        expiringTimerAttachment.bounds = CGRectMake(0, 0, 11.0f, 10.0f);
+    ////        NSAttributedString *expiringString = [NSAttributedString
+    ///attributedStringWithAttachment:expiringTimerAttachment];
+    ////
+    ////        [footer appendAttributedString:expiringString];
+    //    }
 
     return cell;
 }
@@ -995,8 +1025,13 @@ typedef enum : NSUInteger {
     return nil;
 }
 
-- (BOOL)shouldShowMessageStatusAtIndexPath:(NSIndexPath *)indexPath {
+- (BOOL)shouldShowMessageStatusAtIndexPath:(NSIndexPath *)indexPath
+{
     TSMessageAdapter *currentMessage = [self messageAtIndexPath:indexPath];
+
+    if (currentMessage.isExpiringMessage) {
+        return YES;
+    }
 
     // If message failed, say that message should be tapped to retry;
     if (currentMessage.messageType == TSOutgoingMessageAdapter) {
@@ -1050,43 +1085,107 @@ typedef enum : NSUInteger {
 
 
 - (NSAttributedString *)collectionView:(JSQMessagesCollectionView *)collectionView
-    attributedTextForCellBottomLabelAtIndexPath:(NSIndexPath *)indexPath {
-    TSMessageAdapter *msg            = [self messageAtIndexPath:indexPath];
-    NSTextAttachment *textAttachment = [[NSTextAttachment alloc] init];
-    textAttachment.bounds            = CGRectMake(0, 0, 11.0f, 10.0f);
+    attributedTextForCellBottomLabelAtIndexPath:(NSIndexPath *)indexPath
+{
+    if (![self shouldShowMessageStatusAtIndexPath:indexPath]) {
+        return nil;
+    }
 
-    if ([self shouldShowMessageStatusAtIndexPath:indexPath]) {
-        if (msg.messageType == TSOutgoingMessageAdapter) {
-            TSOutgoingMessage *outgoingMessage = (TSOutgoingMessage *)msg;
-            if(outgoingMessage.messageState == TSOutgoingMessageStateUnsent) {
-                NSMutableAttributedString *attrStr =
-                [[NSMutableAttributedString alloc] initWithString:NSLocalizedString(@"FAILED_SENDING_TEXT", nil)];
-                [attrStr appendAttributedString:[NSAttributedString attributedStringWithAttachment:textAttachment]];
-                return attrStr;
-            }
+    id<OWSMessageData> messageData = [self messageAtIndexPath:indexPath];
+    if (![messageData isKindOfClass:[TSMessageAdapter class]]) {
+        return nil;
+    }
+    TSMessageAdapter *message = (TSMessageAdapter *)messageData;
+
+    NSMutableAttributedString *footer = [NSMutableAttributedString new];
+    if (message.messageType == TSOutgoingMessageAdapter) {
+        TSOutgoingMessage *outgoingMessage = (TSOutgoingMessage *)message.interaction;
+        if (outgoingMessage.messageState == TSOutgoingMessageStateUnsent) {
+            NSAttributedString *failedString =
+                [[NSAttributedString alloc] initWithString:NSLocalizedString(@"FAILED_SENDING_TEXT", nil)];
+
+            [footer appendAttributedString:failedString];
+        } else if ([outgoingMessage isEqual:self.lastDeliveredMessage]) {
+            _lastDeliveredMessageIndexPath = indexPath; // So we can remove it later.
+            NSAttributedString *deliveredString =
+                [[NSAttributedString alloc] initWithString:NSLocalizedString(@"DELIVERED_MESSAGE_TEXT", @"")];
+
+            [footer appendAttributedString:deliveredString];
         }
-
-        if ([self.thread isKindOfClass:[TSGroupThread class]]) {
-            NSString *name = [self.contactsManager nameStringForPhoneIdentifier:msg.senderId];
-
-            if (!name) {
-                name = @"";
-            }
-
-            NSMutableAttributedString *attrStr = [[NSMutableAttributedString alloc] initWithString:name];
-            [attrStr appendAttributedString:[NSAttributedString attributedStringWithAttachment:textAttachment]];
-
-            return attrStr;
-        } else {
-            _lastDeliveredMessageIndexPath = indexPath;
-            NSMutableAttributedString *attrStr =
-                [[NSMutableAttributedString alloc] initWithString:NSLocalizedString(@"DELIVERED_MESSAGE_TEXT", @"")];
-            [attrStr appendAttributedString:[NSAttributedString attributedStringWithAttachment:textAttachment]];
-
-            return attrStr;
+        // FIXME TODO incoming messages
+        if (outgoingMessage.isExpiringMessage) {
+            [self startAnimatingTimerForCellAtIndexPath:indexPath];
+            [footer appendAttributedString:[self timerStringForExpiringMessage:outgoingMessage]];
         }
     }
-    return nil;
+
+    if (message.messageType == TSIncomingMessageAdapter && [self.thread isKindOfClass:[TSGroupThread class]]) {
+        TSIncomingMessage *incomingMessage = (TSIncomingMessage *)message.interaction;
+        NSString *_Nonnull name = [self.contactsManager nameStringForPhoneIdentifier:incomingMessage.authorId];
+        NSAttributedString *senderNameString = [[NSAttributedString alloc] initWithString:name];
+
+        [footer appendAttributedString:senderNameString];
+    }
+
+    // Some right padding. This was copy/pasted. There might be a better way using insets.
+    NSTextAttachment *paddingAttachment = [NSTextAttachment new];
+    paddingAttachment.bounds = CGRectMake(0, 0, 11.0f, 10.0f);
+    NSAttributedString *paddingString = [NSAttributedString attributedStringWithAttachment:paddingAttachment];
+    [footer appendAttributedString:paddingString];
+
+    return footer;
+}
+
+- (NSAttributedString *)timerStringForExpiringMessage:(TSMessage *)message
+{
+    //    NSTextAttachment *timerAttachment = [NSTextAttachment new];
+    //    timerAttachment.bounds = CGRectMake(0, 0, 11.0f, 10.0f);
+    //    timerAttachment.image = [UIImage imageNamed:@"warning_white"]; // TODO hourglass based on expiring time.
+    //
+    //    return [NSAttributedString attributedStringWithAttachment:timerAttachment];
+
+    uint64_t remainingTime = message.expiresAt - [NSDate ows_millisecondTimeStamp];
+    NSString *remainingTimeString = [NSString stringWithFormat:@"time left: %llu", remainingTime];
+    return [[NSAttributedString alloc] initWithString:remainingTimeString];
+}
+
+- (void)startAnimatingTimerForCellAtIndexPath:(NSIndexPath *)indexPath
+{
+    if ([self.disappearingMessagesAnimationTimers objectForKey:indexPath]) {
+        // Already animating.
+        return;
+    }
+
+    TSInteraction *interaction = [self interactionAtIndexPath:indexPath];
+    if (![interaction isKindOfClass:[TSMessage class]]) {
+        return;
+    }
+    TSMessage *message = (TSMessage *)interaction;
+
+    // TODO, smarter duration based on how long the message lasts.
+    NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:(message.expiresIn / 5)
+                                                     repeats:YES
+                                                       block:^(NSTimer *_Nonnull aTimer) {
+                                                           [self redrawFooterForIndexPath:indexPath];
+                                                       }];
+    self.disappearingMessagesAnimationTimers[indexPath] = timer;
+}
+
+- (void)redrawFooterForIndexPath:indexPath
+{
+    DDLogVerbose(@"%@ redrawing footer", self.tag);
+    JSQMessagesCollectionViewCell *cell = [self collectionView:self.collectionView cellForItemAtIndexPath:indexPath];
+    cell.cellBottomLabel.attributedText =
+        [self collectionView:self.collectionView attributedTextForCellBottomLabelAtIndexPath:indexPath];
+}
+
+- (void)stopAnimatingTimerForCellAtIndexPath:(NSIndexPath *)indexPath
+{
+    // whippersnapper.
+    NSTimer *oldTimer = self.disappearingMessagesAnimationTimers[indexPath];
+    DDLogDebug(@"%@ Removing timer for indexPath:%@", self.tag, indexPath);
+    [oldTimer invalidate];
+    [self.disappearingMessagesAnimationTimers removeObjectForKey:indexPath];
 }
 
 - (CGFloat)collectionView:(JSQMessagesCollectionView *)collectionView
@@ -1101,11 +1200,16 @@ typedef enum : NSUInteger {
 
 #pragma mark - Actions
 
+- (void)didTapTitle
+{
+    DDLogDebug(@"%@ Tapped title", self.tag);
+    [self performSegueWithIdentifier:OWSMessagesViewControllerSeguePushConversationSettings sender:self];
+}
+
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView
     didTapMessageBubbleAtIndexPath:(NSIndexPath *)indexPath
 {
-    TSMessageAdapter *messageItem =
-        [collectionView.dataSource collectionView:collectionView messageDataForItemAtIndexPath:indexPath];
+    TSMessageAdapter *messageItem = [self messageAtIndexPath:indexPath];
     TSInteraction *interaction = [self interactionAtIndexPath:indexPath];
 
     switch (messageItem.messageType) {
@@ -1220,14 +1324,12 @@ typedef enum : NSUInteger {
                                 // loop through all the other bubbles and set their isPlaying to false
                                 NSInteger num_bubbles = [self collectionView:collectionView numberOfItemsInSection:0];
                                 for (NSInteger i = 0; i < num_bubbles; i++) {
-                                    NSIndexPath *index_path = [NSIndexPath indexPathForRow:i inSection:0];
-                                    TSMessageAdapter *msgAdapter =
-                                        [collectionView.dataSource collectionView:collectionView
-                                                    messageDataForItemAtIndexPath:index_path];
-                                    if (msgAdapter.messageType == TSIncomingMessageAdapter &&
-                                        msgAdapter.isMediaMessage) {
-                                        TSVideoAttachmentAdapter *msgMedia =
-                                            (TSVideoAttachmentAdapter *)[msgAdapter media];
+                                    NSIndexPath *indexPathI = [NSIndexPath indexPathForRow:i inSection:0];
+                                    id<OWSMessageData> message = [self messageAtIndexPath:indexPathI];
+
+                                    if (message.messageType == TSIncomingMessageAdapter && message.isMediaMessage) {
+                                        TSVideoAttachmentAdapter *msgMedia
+                                            = (TSVideoAttachmentAdapter *)[message media];
                                         if ([msgMedia isAudio]) {
                                             if (msgMedia == messageMedia && messageMedia.isPaused) {
                                                 isResuming = YES;
@@ -1485,22 +1587,38 @@ typedef enum : NSUInteger {
 #pragma mark - Navigation
 
 - (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
-    if ([segue.identifier isEqualToString:kFingerprintSegueIdentifier]) {
-        FingerprintViewController *vc = [segue destinationViewController];
-        if ([sender isKindOfClass:[OWSFingerprint class]]) {
-            OWSFingerprint *fingerprint = (OWSFingerprint *)sender;
-            NSString *contactName = [self.contactsManager nameStringForPhoneIdentifier:fingerprint.theirStableId];
-            [vc configureWithThread:self.thread fingerprint:fingerprint contactName:contactName];
-        } else {
-            DDLogError(@"%@ Attempting to segueu to fingerprint VC without a valid fingerprint: %@", self.tag, sender);
+    if ([segue.identifier isEqualToString:OWSMessagesViewControllerSegueShowFingerprint]) {
+        if (![segue.destinationViewController isKindOfClass:[FingerprintViewController class]]) {
+            DDLogError(@"%@ Expected Fingerprint VC but got: %@", self.tag, segue.destinationViewController);
+            return;
         }
-    } else if ([segue.identifier isEqualToString:kUpdateGroupSegueIdentifier]) {
+        FingerprintViewController *vc = (FingerprintViewController *)segue.destinationViewController;
+
+        if (![sender isKindOfClass:[OWSFingerprint class]]) {
+            DDLogError(@"%@ Attempting to segue to fingerprint VC without a valid fingerprint: %@", self.tag, sender);
+            return;
+        }
+        OWSFingerprint *fingerprint = (OWSFingerprint *)sender;
+
+        NSString *contactName = [self.contactsManager nameStringForPhoneIdentifier:fingerprint.theirStableId];
+        [vc configureWithThread:self.thread fingerprint:fingerprint contactName:contactName];
+    } else if ([segue.identifier isEqualToString:OWSMessagesViewControllerSegueUpdateGroup]) {
         NewGroupViewController *vc = [segue destinationViewController];
         [vc configWithThread:(TSGroupThread *)self.thread];
-    } else if ([segue.identifier isEqualToString:kShowGroupMembersSegue]) {
+    } else if ([segue.identifier isEqualToString:OWSMessagesViewControllerSegueShowGroupMembers]) {
         ShowGroupMembersViewController *vc = [segue destinationViewController];
         [vc configWithThread:(TSGroupThread *)self.thread];
+    } else if ([segue.destinationViewController isKindOfClass:[OWSContactInfoTableViewController class]]) {
+        // TODO flesh this out. reduce duplication... can this stuff be wrapped up in a recipient object?
+        OWSContactInfoTableViewController *controller = (OWSContactInfoTableViewController *)segue.destinationViewController;
+
+        if (![self.thread isKindOfClass:[TSContactThread class]]) {
+            DDLogError(
+                @"%@ Unexpectedly segueing to show contact info with non-contact thread: %@", self.tag, self.thread);
+        }
+        [controller configureWithThread:self.thread];
     }
+
 }
 
 
@@ -1633,10 +1751,21 @@ typedef enum : NSUInteger {
 
 - (void)sendMessageAttachment:(NSData *)attachmentData ofType:(NSString *)attachmentType
 {
-    TSOutgoingMessage *message = [[TSOutgoingMessage alloc] initWithTimestamp:[NSDate ows_millisecondTimeStamp]
-                                                                     inThread:self.thread
-                                                                  messageBody:nil
-                                                                attachmentIds:[NSMutableArray new]];
+    TSOutgoingMessage *message;
+    OWSDisappearingMessagesConfiguration *configuration =
+        [OWSDisappearingMessagesConfiguration fetchObjectWithUniqueID:self.thread.uniqueId];
+    if (configuration.isEnabled) {
+        message = [[TSOutgoingMessage alloc] initWithTimestamp:[NSDate ows_millisecondTimeStamp]
+                                                      inThread:self.thread
+                                                   messageBody:nil
+                                                 attachmentIds:[NSMutableArray new]
+                                                     expiresIn:configuration.durationSeconds];
+    } else {
+        message = [[TSOutgoingMessage alloc] initWithTimestamp:[NSDate ows_millisecondTimeStamp]
+                                                      inThread:self.thread
+                                                   messageBody:nil
+                                                 attachmentIds:[NSMutableArray new]];
+    }
 
     [self dismissViewControllerAnimated:YES
                              completion:^{
@@ -1834,8 +1963,9 @@ typedef enum : NSUInteger {
                   if (collectionKey.key) {
                       [self.messageAdapterCache removeObjectForKey:collectionKey.key];
                   }
-                  NSMutableArray *rowsToUpdate = [@[ rowChange.indexPath ] mutableCopy];
 
+                  // remove "delivered from all but final message."
+                  NSMutableArray *rowsToUpdate = [@[ rowChange.indexPath ] mutableCopy];
                   if (_lastDeliveredMessageIndexPath) {
                       [rowsToUpdate addObject:_lastDeliveredMessageIndexPath];
                   }
@@ -1888,13 +2018,13 @@ typedef enum : NSUInteger {
     return message;
 }
 
-// FIXME DANGER this method doesn't always return TSMessageAdapters - it can also return JSQCall!
-- (TSMessageAdapter *)messageAtIndexPath:(NSIndexPath *)indexPath {
+- (id<OWSMessageData>)messageAtIndexPath:(NSIndexPath *)indexPath
+{
     TSInteraction *interaction = [self interactionAtIndexPath:indexPath];
 
-    TSMessageAdapter *messageAdapter = [self.messageAdapterCache objectForKey:interaction.uniqueId];
+    id<OWSMessageData> messageAdapter = [self.messageAdapterCache objectForKey:interaction.uniqueId];
 
-    if (messageAdapter == nil) {
+    if (!messageAdapter) {
         messageAdapter = [TSMessageAdapter messageViewDataWithInteraction:interaction inThread:self.thread];
         [self.messageAdapterCache setObject:messageAdapter forKey: interaction.uniqueId];
     }
@@ -1989,10 +2119,9 @@ typedef enum : NSUInteger {
                       }];
 }
 
-- (void)markAllMessagesAsRead {
-    [self.editingDatabaseConnection readWriteWithBlock:^(YapDatabaseReadWriteTransaction *transaction) {
-      [self.thread markAllAsReadWithTransaction:transaction];
-    }];
+- (void)markAllMessagesAsRead
+{
+    [self.thread markAllAsRead];
 }
 
 - (BOOL)collectionView:(UICollectionView *)collectionView
@@ -2022,7 +2151,7 @@ typedef enum : NSUInteger {
 - (void)updateGroup {
     [self.navController hideDropDown:self];
 
-    [self performSegueWithIdentifier:kUpdateGroupSegueIdentifier sender:self];
+    [self performSegueWithIdentifier:OWSMessagesViewControllerSegueUpdateGroup sender:self];
 }
 
 - (void)leaveGroup
@@ -2181,6 +2310,8 @@ typedef enum : NSUInteger {
 - (NSArray<id<UIPreviewActionItem>> *)previewActionItems {
     return @[];
 }
+
+#pragma mark - Logging
 
 + (NSString *)tag
 {

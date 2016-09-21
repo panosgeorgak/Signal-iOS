@@ -47,7 +47,10 @@
 
 @property JSQMediaItem<OWSMessageEditing> *mediaItem;
 
-// ---
+
+// -- Redeclaring properties from OWSMessageData protocol to synthesize variables
+@property (nonatomic) TSMessageAdapterType messageType;
+@property (nonatomic, getter=isExpiringMessage) BOOL expiringMessage;
 
 @property (nonatomic, copy) NSDate *messageDate;
 @property (nonatomic, retain) NSString *messageBody;
@@ -59,13 +62,32 @@
 
 @implementation TSMessageAdapter
 
-+ (id<JSQMessageData>)messageViewDataWithInteraction:(TSInteraction *)interaction inThread:(TSThread *)thread
+- (instancetype)initWithInteraction:(TSInteraction *)interaction
 {
-    TSMessageAdapter *adapter = [[TSMessageAdapter alloc] init];
-    adapter.interaction = interaction;
-    adapter.messageDate       = interaction.date;
+    self = [super init];
+    if (!self) {
+        return self;
+    }
+
+    _interaction = interaction;
+    _messageDate = interaction.date;
     // TODO casting a string to an integer? At least need a comment here explaining why we are doing this.
-    adapter.identifier        = (NSUInteger)interaction.uniqueId;
+    // Can we just remove this? Haven't found where we're using it...
+    _identifier = (NSUInteger)interaction.uniqueId;
+
+    if ([interaction isKindOfClass:[TSMessage class]]) {
+        TSMessage *message = (TSMessage *)interaction;
+        _expiringMessage = message.isExpiringMessage;
+    } else {
+        _expiringMessage = NO;
+    }
+
+    return self;
+}
+
++ (id<OWSMessageData>)messageViewDataWithInteraction:(TSInteraction *)interaction inThread:(TSThread *)thread
+{
+    TSMessageAdapter *adapter = [[TSMessageAdapter alloc] initWithInteraction:interaction];
 
     if ([thread isKindOfClass:[TSContactThread class]]) {
         adapter.thread = (TSContactThread *)thread;
