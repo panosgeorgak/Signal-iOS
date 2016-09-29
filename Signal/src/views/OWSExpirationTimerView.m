@@ -31,10 +31,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)willMoveToWindow:(nullable UIWindow *)newWindow
 {
-//    if (!window) {
-//        DDLogVerbose(@"%@ expiring timer since we're leaving view.");
-//        [self endAnyTimer];
-//    }
+    //    if (!window) {
+    //        DDLogVerbose(@"%@ expiring timer since we're leaving view.");
+    //        [self endAnyTimer];
+    //    }
 }
 
 - (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
@@ -62,11 +62,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)animateTimer
 {
-    uint64_t secondsLeft = self.expiresAtSeconds - (uint64_t)[NSDate new].timeIntervalSince1970;
-    DDLogVerbose(@"%@ Animating timer with seconds left: %llu", self.logTag, secondsLeft);
+    double secondsLeft = self.expiresAtSeconds - [NSDate new].timeIntervalSince1970;
 
+    if (secondsLeft > INT_MAX) { // overflow
+        secondsLeft = 0;
+    }
+
+    DDLogVerbose(@"%@ Animating timer with seconds left: %f", self.logTag, secondsLeft);
     // TODO better animation.
-    self.alpha = (secondsLeft / (float)self.initialDurationSeconds) / 2;
+    self.alpha = ((CGFloat)secondsLeft / (CGFloat)self.initialDurationSeconds);
 }
 
 #pragma mark - Logging

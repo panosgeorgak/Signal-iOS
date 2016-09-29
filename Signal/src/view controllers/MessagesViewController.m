@@ -20,12 +20,12 @@
 #import "OWSContactInfoTableViewController.h"
 #import "OWSContactsManager.h"
 #import "OWSDisplayedMessageCollectionViewCell.h"
-#import "OWSExpirableMessageView.h"
 #import "OWSErrorMessage.h"
+#import "OWSExpirableMessageView.h"
+#import "OWSIncomingMessageCollectionViewCell.h"
 #import "OWSInfoMessage.h"
 #import "OWSMessagesBubblesSizeCalculator.h"
 #import "OWSOutgoingMessageCollectionViewCell.h"
-#import "OWSIncomingMessageCollectionViewCell.h"
 #import "PhoneManager.h"
 #import "PreferencesUtil.h"
 #import "ShowGroupMembersViewController.h"
@@ -263,9 +263,17 @@ typedef enum : NSUInteger {
     [self.collectionView registerNib:[OWSOutgoingMessageCollectionViewCell nib]
           forCellWithReuseIdentifier:[OWSOutgoingMessageCollectionViewCell cellReuseIdentifier]];
 
+    self.outgoingMediaCellIdentifier = [OWSOutgoingMessageCollectionViewCell mediaCellReuseIdentifier];
+    [self.collectionView registerNib:[OWSOutgoingMessageCollectionViewCell nib]
+          forCellWithReuseIdentifier:[OWSOutgoingMessageCollectionViewCell mediaCellReuseIdentifier]];
+
     self.incomingCellIdentifier = [OWSIncomingMessageCollectionViewCell cellReuseIdentifier];
     [self.collectionView registerNib:[OWSIncomingMessageCollectionViewCell nib]
           forCellWithReuseIdentifier:[OWSIncomingMessageCollectionViewCell cellReuseIdentifier]];
+
+    self.incomingMediaCellIdentifier = [OWSIncomingMessageCollectionViewCell mediaCellReuseIdentifier];
+    [self.collectionView registerNib:[OWSIncomingMessageCollectionViewCell nib]
+          forCellWithReuseIdentifier:[OWSIncomingMessageCollectionViewCell mediaCellReuseIdentifier]];
 }
 
 - (void)toggleObservers:(BOOL)shouldObserve
@@ -887,7 +895,8 @@ typedef enum : NSUInteger {
 
     if (message.isExpiringMessage && [cell conformsToProtocol:@protocol(OWSExpirableMessageView)]) {
         id<OWSExpirableMessageView> expirableView = (id<OWSExpirableMessageView>)cell;
-        [expirableView startExpirationTimerWithExpiresAtSeconds:message.expiresAtSeconds initialDurationSeconds:message.expiresInSeconds];
+        [expirableView startExpirationTimerWithExpiresAtSeconds:message.expiresAtSeconds
+                                         initialDurationSeconds:message.expiresInSeconds];
     }
 
     return cell;

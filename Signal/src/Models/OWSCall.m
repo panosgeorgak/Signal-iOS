@@ -10,6 +10,8 @@
 // -- Redeclaring properties from OWSMessageData protocol to synthesize variables
 @property (nonatomic) TSMessageAdapterType messageType;
 @property (nonatomic, getter=isExpiringMessage) BOOL expiringMessage;
+@property (nonatomic) uint64_t expiresAtSeconds;
+@property (nonatomic) uint32_t expiresInSeconds;
 
 @end
 
