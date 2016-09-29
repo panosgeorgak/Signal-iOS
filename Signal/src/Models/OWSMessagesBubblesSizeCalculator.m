@@ -23,11 +23,13 @@
 {
     CGSize superSize = [super messageBubbleSizeForMessageData:messageData atIndexPath:indexPath withLayout:layout];
 
-    TSMessageAdapter *message = (TSMessageAdapter *)messageData;
-    if (message.messageType == TSInfoMessageAdapter || message.messageType == TSErrorMessageAdapter) {
-        // Prevent cropping message text by accounting for message container/icon
-        // But also allow for multi-line error messages.
-        superSize.height = fmax(superSize.height, OWSDisplayedMessageCellHeight);
+    if ([messageData isKindOfClass:[TSMessageAdapter class]]) {
+        TSMessageAdapter *message = (TSMessageAdapter *)messageData;
+
+        if (message.messageType == TSInfoMessageAdapter || message.messageType == TSErrorMessageAdapter) {
+            // One-line error messages feel a little cramped, but multiline are OK as is.
+            superSize.height = fmaxf(superSize.height, OWSDisplayedMessageCellMinimumHeight);
+        }
     }
 
     return superSize;

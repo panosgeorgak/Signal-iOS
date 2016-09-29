@@ -25,7 +25,7 @@
                         <color key="textColor" cocoaTouchSystemColor="darkTextColor"/>
                         <nil key="highlightedColor"/>
                     </label>
-                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="qCf-bs-dBd" userLabel="textContainer">
+                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="qCf-bs-dBd" userLabel="Bubble container">
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Info Message" textAlignment="center" lineBreakMode="wordWrap" numberOfLines="0" baselineAdjustment="alignBaselines" minimumScaleFactor="0.5" translatesAutoresizingMaskIntoConstraints="NO" id="OVa-Xw-5vl" customClass="JSQMessagesLabel">
                                 <constraints>
@@ -69,7 +69,7 @@
                 <outlet property="cellTopLabel" destination="gcR-Rk-KDC" id="Ogk-hD-ge8"/>
                 <outlet property="cellTopLabelHeightConstraint" destination="ckj-xD-FJI" id="wBH-pQ-Wc7"/>
                 <outlet property="headerImageView" destination="ePO-Cy-jUE" id="4uq-2C-V7U"/>
-                <outlet property="textContainer" destination="qCf-bs-dBd" id="fL7-LO-El1"/>
+                <outlet property="messageBubbleContainerView" destination="qCf-bs-dBd" id="WMx-Di-LZG"/>
             </connections>
             <point key="canvasLocation" x="219" y="433"/>
         </collectionViewCell>

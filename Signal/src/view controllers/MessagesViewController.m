@@ -981,7 +981,7 @@ typedef enum : NSUInteger {
     OWSDisplayedMessageCollectionViewCell *infoCell = [self loadDisplayedMessageCollectionViewCellForIndexPath:indexPath];
     infoCell.cellLabel.text = [infoMessage text];
     infoCell.cellLabel.textColor = [UIColor darkGrayColor];
-    infoCell.textContainer.layer.borderColor = infoCell.textContainer.layer.borderColor = [[UIColor ows_infoMessageBorderColor] CGColor];
+    infoCell.messageBubbleContainerView.layer.borderColor = [[UIColor ows_infoMessageBorderColor] CGColor];
     infoCell.headerImageView.image = [UIImage imageNamed:@"warning_white"];
 
     return infoCell;
@@ -993,7 +993,7 @@ typedef enum : NSUInteger {
     OWSDisplayedMessageCollectionViewCell *errorCell = [self loadDisplayedMessageCollectionViewCellForIndexPath:indexPath];
     errorCell.cellLabel.text = [errorMessage text];
     errorCell.cellLabel.textColor = [UIColor darkGrayColor];
-    errorCell.textContainer.layer.borderColor = [[UIColor ows_errorMessageBorderColor] CGColor];
+    errorCell.messageBubbleContainerView.layer.borderColor = [[UIColor ows_errorMessageBorderColor] CGColor];
     errorCell.headerImageView.image = [UIImage imageNamed:@"error_white"];
 
     return errorCell;
