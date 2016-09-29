@@ -23,6 +23,7 @@
 #import "OWSErrorMessage.h"
 #import "OWSInfoMessage.h"
 #import "OWSMessagesBubblesSizeCalculator.h"
+#import "OWSOutgoingMessageCollectionViewCell.h"
 #import "PhoneManager.h"
 #import "PreferencesUtil.h"
 #import "ShowGroupMembersViewController.h"
@@ -107,7 +108,7 @@ typedef enum : NSUInteger {
 @property (nonatomic, strong) UILabel *navbarTitleLabel;
 @property (nonatomic, retain) UIButton *attachButton;
 @property (nonatomic, retain) NSIndexPath *lastDeliveredMessageIndexPath;
-@property NSMutableDictionary<NSIndexPath *, NSTimer *> *disappearingMessagesAnimationTimers;
+//@property NSMutableDictionary<NSString *, NSTimer *> *disappearingMessagesAnimationTimers;
 
 @property NSUInteger page;
 @property (nonatomic) BOOL composeOnOpen;
@@ -206,6 +207,7 @@ typedef enum : NSUInteger {
     [super viewDidLoad];
 
     self.navController = (APNavigationController *)self.navigationController;
+    self.outgoingCellIdentifier = [OWSOutgoingMessageCollectionViewCell cellReuseIdentifier];
 
     // JSQMVC width is 375px at this point (as specified by the xib), but this causes
     // our initial bubble calculations to be off since they happen before the containing
@@ -216,6 +218,8 @@ typedef enum : NSUInteger {
     [self.navigationController.navigationBar setTranslucent:NO];
 
     self.messageAdapterCache = [[NSCache alloc] init];
+//    self.disappearingMessagesAnimationTimers = [NSMutableDictionary new];
+
     _attachButton = [[UIButton alloc] init];
     [_attachButton setFrame:CGRectMake(0,
                                        0,
@@ -254,6 +258,10 @@ typedef enum : NSUInteger {
 
     [self.collectionView registerNib:[OWSDisplayedMessageCollectionViewCell nib]
           forCellWithReuseIdentifier:[OWSDisplayedMessageCollectionViewCell cellReuseIdentifier]];
+
+    [self.collectionView registerNib:[OWSOutgoingMessageCollectionViewCell nib]
+          forCellWithReuseIdentifier:[OWSOutgoingMessageCollectionViewCell cellReuseIdentifier]];
+
 }
 
 - (void)toggleObservers:(BOOL)shouldObserve
@@ -783,6 +791,18 @@ typedef enum : NSUInteger {
 
 #pragma mark - JSQMessages CollectionView DataSource
 
+
+
+- (void)collectionView:(UICollectionView *)collectionView didEndDisplayingCell:(UICollectionViewCell *)cell forItemAtIndexPath:(NSIndexPath *)indexPath
+{
+    // FIXME incoming too.
+    if (![cell isKindOfClass:[OWSOutgoingMessageCollectionViewCell class]]) {
+        return;
+    }
+    OWSOutgoingMessageCollectionViewCell *outgoingCell = (OWSOutgoingMessageCollectionViewCell *)cell;
+    [outgoingCell endAnyExpirationTimerAnimation];
+}
+
 - (id<OWSMessageData>)collectionView:(JSQMessagesCollectionView *)collectionView
        messageDataForItemAtIndexPath:(NSIndexPath *)indexPath
 {
@@ -840,7 +860,17 @@ typedef enum : NSUInteger {
             cell = [self loadIncomingMessageCellForMessage:message atIndexPath:indexPath];
         } break;
         case TSOutgoingMessageAdapter: {
-            cell = [self loadOutgoingCellForMessage:message atIndexPath:indexPath];
+            if (![message isKindOfClass:[TSMessageAdapter class]]) {
+                DDLogError(@"%@ Unexpected message data type for TSOutgoingMessageAdapter:%@", self.tag, message);
+                return [super collectionView:collectionView cellForItemAtIndexPath:indexPath];
+            }
+            TSMessageAdapter *adapter = (TSMessageAdapter *)message;
+            if(![adapter.interaction isKindOfClass:[TSOutgoingMessage class]]) {
+                DDLogError(@"%@ Unexpected interaction for for adapter TSOutgoingMessageAdapter:%@", self.tag, adapter.interaction);
+                return [super collectionView:collectionView cellForItemAtIndexPath:indexPath];
+            }
+            TSOutgoingMessage *outgoingMessage = (TSOutgoingMessage *)adapter.interaction;
+            cell = [self loadOutgoingCellForMessage:outgoingMessage atIndexPath:indexPath];
         } break;
         default: {
             DDLogWarn(@"using default cell constructor for message: %@", message);
@@ -870,55 +900,24 @@ typedef enum : NSUInteger {
     return cell;
 }
 
-- (JSQMessagesCollectionViewCell *)loadOutgoingCellForMessage:(id<OWSMessageData>)message
+- (JSQMessagesCollectionViewCell *)loadOutgoingCellForMessage:(TSOutgoingMessage *)message
                                                   atIndexPath:(NSIndexPath *)indexPath
 {
-    JSQMessagesCollectionViewCell *cell =
-        (JSQMessagesCollectionViewCell *)[super collectionView:self.collectionView cellForItemAtIndexPath:indexPath];
-    if (!message.isMediaMessage) {
+    OWSOutgoingMessageCollectionViewCell *cell
+        = (OWSOutgoingMessageCollectionViewCell *)[super collectionView:self.collectionView
+                                                 cellForItemAtIndexPath:indexPath];
+
+    if (message.isExpiringMessage) {
+        [cell startExpirationTimerWithExpiresAtSeconds:message.expiresAt / 1000 initialDurationSeconds:message.expiresIn];
+    }
+
+    if (!message.hasAttachments) {
         cell.textView.textColor          = [UIColor whiteColor];
         cell.textView.linkTextAttributes = @{
             NSForegroundColorAttributeName : cell.textView.textColor,
             NSUnderlineStyleAttributeName : @(NSUnderlineStyleSingle | NSUnderlinePatternSolid)
         };
     }
-
-    //    if (![message isKindOfClass:[TSMessageAdapter class]]) {
-    //        DDLogError(@"%@ unexpected message for outoing cell: %@", self.tag, message);
-    //        return cell;
-    //    }
-    //    TSMessageAdapter *adapter = (TSMessageAdapter *)message;
-    //
-    //    if (![adapter.interaction isKindOfClass:[TSOutgoingMessage class]]) {
-    //        DDLogError(@"%@ unexpected interaction for outoing cell: %@", self.tag, adapter.interaction);
-    //        return cell;
-    //    }
-    //    TSOutgoingMessage *outgoingMessage = (TSOutgoingMessage *)adapter.interaction;
-    //
-    //    if (outgoingMessage.isExpiringMessage) {
-    //        CGRect originalFrame = cell.cellBottomLabel.frame;
-    //////        CGRect newFrame = CGRectOffset(originalFrame, -20, 0);
-    ////
-    ////        CGRect newFrame = CGRectMake(0, 0, origa)
-    ////        cell.cellBottomLabel.frame = newFrame;
-    //
-    //        UIImage *image = [UIImage imageNamed:@"warning_white"];
-    //        UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
-    ////        imageView.frame = CGRectMake(newFrame.origin.x + newFrame.size.width, newFrame.origin.y, 32, 32);
-    //        imageView.frame = originalFrame;
-    //        [cell.cellBottomLabel.superview insertSubview:imageView aboveSubview:cell.cellBottomLabel];
-    //
-    //        // FIXME to do.
-    //        // UIImage *image = [UIImage animatedImageNamed:@"expiration_hourglass" duration:message.expirationTime]
-    ////        NSTextAttachment *expiringTimerAttachment = [NSTextAttachment new];
-    ////        expiringTimerAttachment.image = [UIImage imageNamed:@"warning_white"];
-    ////        expiringTimerAttachment.bounds = CGRectMake(0, 0, 11.0f, 10.0f);
-    ////        NSAttributedString *expiringString = [NSAttributedString
-    ///attributedStringWithAttachment:expiringTimerAttachment];
-    ////
-    ////        [footer appendAttributedString:expiringString];
-    //    }
-
     return cell;
 }
 
@@ -1112,11 +1111,6 @@ typedef enum : NSUInteger {
 
             [footer appendAttributedString:deliveredString];
         }
-        // FIXME TODO incoming messages
-        if (outgoingMessage.isExpiringMessage) {
-            [self startAnimatingTimerForCellAtIndexPath:indexPath];
-            [footer appendAttributedString:[self timerStringForExpiringMessage:outgoingMessage]];
-        }
     }
 
     if (message.messageType == TSIncomingMessageAdapter && [self.thread isKindOfClass:[TSGroupThread class]]) {
@@ -1134,58 +1128,6 @@ typedef enum : NSUInteger {
     [footer appendAttributedString:paddingString];
 
     return footer;
-}
-
-- (NSAttributedString *)timerStringForExpiringMessage:(TSMessage *)message
-{
-    //    NSTextAttachment *timerAttachment = [NSTextAttachment new];
-    //    timerAttachment.bounds = CGRectMake(0, 0, 11.0f, 10.0f);
-    //    timerAttachment.image = [UIImage imageNamed:@"warning_white"]; // TODO hourglass based on expiring time.
-    //
-    //    return [NSAttributedString attributedStringWithAttachment:timerAttachment];
-
-    uint64_t remainingTime = message.expiresAt - [NSDate ows_millisecondTimeStamp];
-    NSString *remainingTimeString = [NSString stringWithFormat:@"time left: %llu", remainingTime];
-    return [[NSAttributedString alloc] initWithString:remainingTimeString];
-}
-
-- (void)startAnimatingTimerForCellAtIndexPath:(NSIndexPath *)indexPath
-{
-    if ([self.disappearingMessagesAnimationTimers objectForKey:indexPath]) {
-        // Already animating.
-        return;
-    }
-
-    TSInteraction *interaction = [self interactionAtIndexPath:indexPath];
-    if (![interaction isKindOfClass:[TSMessage class]]) {
-        return;
-    }
-    TSMessage *message = (TSMessage *)interaction;
-
-    // TODO, smarter duration based on how long the message lasts.
-    NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:(message.expiresIn / 5)
-                                                     repeats:YES
-                                                       block:^(NSTimer *_Nonnull aTimer) {
-                                                           [self redrawFooterForIndexPath:indexPath];
-                                                       }];
-    self.disappearingMessagesAnimationTimers[indexPath] = timer;
-}
-
-- (void)redrawFooterForIndexPath:indexPath
-{
-    DDLogVerbose(@"%@ redrawing footer", self.tag);
-    JSQMessagesCollectionViewCell *cell = [self collectionView:self.collectionView cellForItemAtIndexPath:indexPath];
-    cell.cellBottomLabel.attributedText =
-        [self collectionView:self.collectionView attributedTextForCellBottomLabelAtIndexPath:indexPath];
-}
-
-- (void)stopAnimatingTimerForCellAtIndexPath:(NSIndexPath *)indexPath
-{
-    // whippersnapper.
-    NSTimer *oldTimer = self.disappearingMessagesAnimationTimers[indexPath];
-    DDLogDebug(@"%@ Removing timer for indexPath:%@", self.tag, indexPath);
-    [oldTimer invalidate];
-    [self.disappearingMessagesAnimationTimers removeObjectForKey:indexPath];
 }
 
 - (CGFloat)collectionView:(JSQMessagesCollectionView *)collectionView
@@ -1950,6 +1892,7 @@ typedef enum : NSUInteger {
               }
               case YapDatabaseViewChangeInsert: {
                   [self.collectionView insertItemsAtIndexPaths:@[ rowChange.newIndexPath ]];
+
                   scrollToBottom = YES;
                   break;
               }
@@ -1988,6 +1931,22 @@ typedef enum : NSUInteger {
         }];
 }
 
+- (void)touchMessage:(NSTimer *)timer
+{
+    NSString *messageId = timer.userInfo[@"messageId"];
+    if (!messageId) {
+        DDLogWarn(@"%@ Couldn't touch message with blank id", self.tag);
+        return;
+    }
+    TSMessage *message = [TSMessage fetchObjectWithUniqueID:messageId];
+
+    if (!message) {
+        DDLogWarn(@"%@ Couldn't find message for messageId: %@", self.tag, messageId);
+        return;
+    }
+    [message touch];
+}
+
 #pragma mark - UICollectionView DataSource
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
@@ -2005,6 +1964,7 @@ typedef enum : NSUInteger {
       NSUInteger row                    = (NSUInteger)indexPath.row;
       NSUInteger section                = (NSUInteger)indexPath.section;
       NSUInteger numberOfItemsInSection = [self.messageMappings numberOfItemsInSection:section];
+
 
       NSAssert(row < numberOfItemsInSection,
                @"Cannot fetch message because row %d is >= numberOfItemsInSection %d",
