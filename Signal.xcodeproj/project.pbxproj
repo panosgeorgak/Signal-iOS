@@ -11,6 +11,8 @@
 		30209C98DABCE82064B4EAF5 /* libPods-SignalTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A33D3C7EB4B17BDBD47F0FCC /* libPods-SignalTests.a */; };
 		450873C31D9D5149006B54F2 /* OWSExpirationTimerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 450873C21D9D5149006B54F2 /* OWSExpirationTimerView.m */; };
 		450873C41D9D5149006B54F2 /* OWSExpirationTimerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 450873C21D9D5149006B54F2 /* OWSExpirationTimerView.m */; };
+		450873C71D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 450873C61D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m */; };
+		450873C81D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 450873C61D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m */; };
 		4520D8D51D417D8E00123472 /* Photos.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4520D8D41D417D8E00123472 /* Photos.framework */; };
 		452E3C8E1D935C77002A45B0 /* OWSContactInfoTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 452E3C8D1D935C77002A45B0 /* OWSContactInfoTableViewController.m */; };
 		452E3C8F1D935C77002A45B0 /* OWSContactInfoTableViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 452E3C8D1D935C77002A45B0 /* OWSContactInfoTableViewController.m */; };
@@ -528,6 +530,9 @@
 /* Begin PBXFileReference section */
 		450873C11D9D5149006B54F2 /* OWSExpirationTimerView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OWSExpirationTimerView.h; sourceTree = "<group>"; };
 		450873C21D9D5149006B54F2 /* OWSExpirationTimerView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OWSExpirationTimerView.m; sourceTree = "<group>"; };
+		450873C51D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OWSIncomingMessageCollectionViewCell.h; sourceTree = "<group>"; };
+		450873C61D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OWSIncomingMessageCollectionViewCell.m; sourceTree = "<group>"; };
+		450873C91D9D86F4006B54F2 /* OWSExpirableMessageView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OWSExpirableMessageView.h; sourceTree = "<group>"; };
 		4520D8D41D417D8E00123472 /* Photos.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Photos.framework; path = System/Library/Frameworks/Photos.framework; sourceTree = SDKROOT; };
 		4526BD481CA61C8D00166BC8 /* OWSMessageEditing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OWSMessageEditing.h; sourceTree = "<group>"; };
 		452E3C8C1D935C77002A45B0 /* OWSContactInfoTableViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OWSContactInfoTableViewController.h; sourceTree = "<group>"; };
@@ -1785,9 +1790,11 @@
 				45C681B91D305C080050903A /* OWSCallCollectionViewCell.h */,
 				45C681BA1D305C080050903A /* OWSCallCollectionViewCell.m */,
 				45C681C01D305C9E0050903A /* OWSCallCollectionViewCell.xib */,
+				450873C51D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.h */,
+				450873C61D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m */,
+				45F2B1951D9CA207000D2C69 /* OWSIncomingMessageCollectionViewCell.xib */,
 				45F2B1921D9C9F48000D2C69 /* OWSOutgoingMessageCollectionViewCell.h */,
 				45F2B1931D9C9F48000D2C69 /* OWSOutgoingMessageCollectionViewCell.m */,
-				45F2B1951D9CA207000D2C69 /* OWSIncomingMessageCollectionViewCell.xib */,
 				45F2B1961D9CA207000D2C69 /* OWSOutgoingMessageCollectionViewCell.xib */,
 				A5509ECB1A69B1D600ABA4BC /* CountryCodeTableViewCell.h */,
 				A5509ECC1A69B1D600ABA4BC /* CountryCodeTableViewCell.m */,
@@ -1800,6 +1807,7 @@
 				459311FB1D75C948008DD4F0 /* OWSDeviceTableViewCell.m */,
 				450873C11D9D5149006B54F2 /* OWSExpirationTimerView.h */,
 				450873C21D9D5149006B54F2 /* OWSExpirationTimerView.m */,
+				450873C91D9D86F4006B54F2 /* OWSExpirableMessageView.h */,
 			);
 			name = Views;
 			path = views;
@@ -2763,6 +2771,7 @@
 				76EB058A18170B33006006FC /* Release.m in Sources */,
 				76EB061018170B33006006FC /* EventWindow.m in Sources */,
 				E197B62718BBF63B00F073E5 /* SoundBoard.m in Sources */,
+				450873C71D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m in Sources */,
 				76EB058418170B33006006FC /* LocalizableText.m in Sources */,
 				76EB057A18170B33006006FC /* OWSContactsManager.m in Sources */,
 				E197B61918BBEC1A00F073E5 /* RemoteIOBufferListWrapper.m in Sources */,
@@ -3113,6 +3122,7 @@
 				B660F6C61C29868000687D6E /* MasterSecretTest.m in Sources */,
 				B660F6D91C29868000687D6E /* CyclicalBufferTest.m in Sources */,
 				B660F6DC1C29868000687D6E /* FutureUtilTest.m in Sources */,
+				450873C81D9D867B006B54F2 /* OWSIncomingMessageCollectionViewCell.m in Sources */,
 				B660F6CA1C29868000687D6E /* LowLatencyConnectorTest.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -2,15 +2,12 @@
 //  Copyright © 2016 Open Whisper Systems. All rights reserved.
 
 #import <JSQMessagesViewController/JSQMessagesCollectionViewCellOutgoing.h>
+#import "OWSExpirableMessageView.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface OWSOutgoingMessageCollectionViewCell : JSQMessagesCollectionViewCellOutgoing
+@interface OWSOutgoingMessageCollectionViewCell : JSQMessagesCollectionViewCellOutgoing <OWSExpirableMessageView>
 
-- (void)startExpirationTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
-                          initialDurationSeconds:(uint32_t)initialDurationSeconds;
-
-- (void)endAnyExpirationTimerAnimation;
 
 @end
 

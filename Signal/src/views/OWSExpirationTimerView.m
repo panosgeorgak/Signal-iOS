@@ -17,6 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)dealloc
 {
+    DDLogDebug(@"%@ invalidating old animation timer in dealloc", self.logTag);
     [_animationTimer invalidate];
 }
 
@@ -28,20 +29,35 @@ NS_ASSUME_NONNULL_BEGIN
     }
 }
 
-- (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds initialDurationSeconds:(uint32_t)initialDurationSeconds
+- (void)willMoveToWindow:(nullable UIWindow *)newWindow
 {
-    DDLogDebug(@"%@ Starting animation timer with expiresAtSeconds: %llu initialDurationSeconds: %d", self.logTag, expiresAtSeconds, initialDurationSeconds);
+//    if (!window) {
+//        DDLogVerbose(@"%@ expiring timer since we're leaving view.");
+//        [self endAnyTimer];
+//    }
+}
+
+- (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
+                initialDurationSeconds:(uint32_t)initialDurationSeconds
+{
+    DDLogDebug(@"%@ Starting animation timer with expiresAtSeconds: %llu initialDurationSeconds: %d",
+        self.logTag,
+        expiresAtSeconds,
+        initialDurationSeconds);
     self.expiresAtSeconds = expiresAtSeconds;
     self.initialDurationSeconds = initialDurationSeconds;
 
 
     [self animateTimer];
-    self.animationTimer = [NSTimer scheduledTimerWithTimeInterval:initialDurationSeconds / 10.0 // assumes a 10 step timer animation.
-                                                           target:self
-                                                         selector:@selector(animateTimer)
-                                                         userInfo:nil
-                                                          repeats:YES];
 
+    __weak typeof(self) wself = self;
+
+    self.animationTimer =
+        [NSTimer scheduledTimerWithTimeInterval:initialDurationSeconds / 10.0 // assumes a 10 step timer animation.
+                                         target:wself
+                                       selector:@selector(animateTimer)
+                                       userInfo:nil
+                                        repeats:YES];
 }
 
 - (void)animateTimer
@@ -50,7 +66,7 @@ NS_ASSUME_NONNULL_BEGIN
     DDLogVerbose(@"%@ Animating timer with seconds left: %llu", self.logTag, secondsLeft);
 
     // TODO better animation.
-    self.alpha = (secondsLeft / (float)self.initialDurationSeconds)/2;
+    self.alpha = (secondsLeft / (float)self.initialDurationSeconds) / 2;
 }
 
 #pragma mark - Logging

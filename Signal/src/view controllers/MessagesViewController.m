@@ -20,10 +20,12 @@
 #import "OWSContactInfoTableViewController.h"
 #import "OWSContactsManager.h"
 #import "OWSDisplayedMessageCollectionViewCell.h"
+#import "OWSExpirableMessageView.h"
 #import "OWSErrorMessage.h"
 #import "OWSInfoMessage.h"
 #import "OWSMessagesBubblesSizeCalculator.h"
 #import "OWSOutgoingMessageCollectionViewCell.h"
+#import "OWSIncomingMessageCollectionViewCell.h"
 #import "PhoneManager.h"
 #import "PreferencesUtil.h"
 #import "ShowGroupMembersViewController.h"
@@ -207,7 +209,6 @@ typedef enum : NSUInteger {
     [super viewDidLoad];
 
     self.navController = (APNavigationController *)self.navigationController;
-    self.outgoingCellIdentifier = [OWSOutgoingMessageCollectionViewCell cellReuseIdentifier];
 
     // JSQMVC width is 375px at this point (as specified by the xib), but this causes
     // our initial bubble calculations to be off since they happen before the containing
@@ -218,7 +219,6 @@ typedef enum : NSUInteger {
     [self.navigationController.navigationBar setTranslucent:NO];
 
     self.messageAdapterCache = [[NSCache alloc] init];
-//    self.disappearingMessagesAnimationTimers = [NSMutableDictionary new];
 
     _attachButton = [[UIButton alloc] init];
     [_attachButton setFrame:CGRectMake(0,
@@ -259,9 +259,13 @@ typedef enum : NSUInteger {
     [self.collectionView registerNib:[OWSDisplayedMessageCollectionViewCell nib]
           forCellWithReuseIdentifier:[OWSDisplayedMessageCollectionViewCell cellReuseIdentifier]];
 
+    self.outgoingCellIdentifier = [OWSOutgoingMessageCollectionViewCell cellReuseIdentifier];
     [self.collectionView registerNib:[OWSOutgoingMessageCollectionViewCell nib]
           forCellWithReuseIdentifier:[OWSOutgoingMessageCollectionViewCell cellReuseIdentifier]];
 
+    self.incomingCellIdentifier = [OWSIncomingMessageCollectionViewCell cellReuseIdentifier];
+    [self.collectionView registerNib:[OWSIncomingMessageCollectionViewCell nib]
+          forCellWithReuseIdentifier:[OWSIncomingMessageCollectionViewCell cellReuseIdentifier]];
 }
 
 - (void)toggleObservers:(BOOL)shouldObserve
@@ -791,16 +795,16 @@ typedef enum : NSUInteger {
 
 #pragma mark - JSQMessages CollectionView DataSource
 
-
-
-- (void)collectionView:(UICollectionView *)collectionView didEndDisplayingCell:(UICollectionViewCell *)cell forItemAtIndexPath:(NSIndexPath *)indexPath
+- (void)collectionView:(UICollectionView *)collectionView
+    didEndDisplayingCell:(UICollectionViewCell *)cell
+      forItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    // FIXME incoming too.
-    if (![cell isKindOfClass:[OWSOutgoingMessageCollectionViewCell class]]) {
+    // Stop any expiration timers running for removed cells.
+    if (![cell conformsToProtocol:@protocol(OWSExpirableMessageView)]) {
         return;
     }
-    OWSOutgoingMessageCollectionViewCell *outgoingCell = (OWSOutgoingMessageCollectionViewCell *)cell;
-    [outgoingCell endAnyExpirationTimerAnimation];
+    id<OWSExpirableMessageView> expirableMessageView = (id<OWSExpirableMessageView>)cell;
+    [expirableMessageView endAnyExpirationTimer];
 }
 
 - (id<OWSMessageData>)collectionView:(JSQMessagesCollectionView *)collectionView
@@ -865,8 +869,10 @@ typedef enum : NSUInteger {
                 return [super collectionView:collectionView cellForItemAtIndexPath:indexPath];
             }
             TSMessageAdapter *adapter = (TSMessageAdapter *)message;
-            if(![adapter.interaction isKindOfClass:[TSOutgoingMessage class]]) {
-                DDLogError(@"%@ Unexpected interaction for for adapter TSOutgoingMessageAdapter:%@", self.tag, adapter.interaction);
+            if (![adapter.interaction isKindOfClass:[TSOutgoingMessage class]]) {
+                DDLogError(@"%@ Unexpected interaction for for adapter TSOutgoingMessageAdapter:%@",
+                    self.tag,
+                    adapter.interaction);
                 return [super collectionView:collectionView cellForItemAtIndexPath:indexPath];
             }
             TSOutgoingMessage *outgoingMessage = (TSOutgoingMessage *)adapter.interaction;
@@ -878,6 +884,11 @@ typedef enum : NSUInteger {
         } break;
     }
     cell.delegate = collectionView;
+
+    if (message.isExpiringMessage && [cell conformsToProtocol:@protocol(OWSExpirableMessageView)]) {
+        id<OWSExpirableMessageView> expirableView = (id<OWSExpirableMessageView>)cell;
+        [expirableView startExpirationTimerWithExpiresAtSeconds:message.expiresAtSeconds initialDurationSeconds:message.expiresInSeconds];
+    }
 
     return cell;
 }
@@ -906,10 +917,6 @@ typedef enum : NSUInteger {
     OWSOutgoingMessageCollectionViewCell *cell
         = (OWSOutgoingMessageCollectionViewCell *)[super collectionView:self.collectionView
                                                  cellForItemAtIndexPath:indexPath];
-
-    if (message.isExpiringMessage) {
-        [cell startExpirationTimerWithExpiresAtSeconds:message.expiresAt / 1000 initialDurationSeconds:message.expiresIn];
-    }
 
     if (!message.hasAttachments) {
         cell.textView.textColor          = [UIColor whiteColor];

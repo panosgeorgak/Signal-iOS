@@ -1,18 +1,18 @@
-//  Created by Michael Kirk on 9/28/16.
+//  Created by Michael Kirk on 9/29/16.
 //  Copyright © 2016 Open Whisper Systems. All rights reserved.
 
-#import "OWSOutgoingMessageCollectionViewCell.h"
+#import "OWSIncomingMessageCollectionViewCell.h"
 #import "OWSExpirationTimerView.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface OWSOutgoingMessageCollectionViewCell ()
+@interface OWSIncomingMessageCollectionViewCell ()
 
 @property (nonatomic) IBOutlet OWSExpirationTimerView *expirationTimerView;
 
 @end
 
-@implementation OWSOutgoingMessageCollectionViewCell
+@implementation OWSIncomingMessageCollectionViewCell
 
 - (void)startExpirationTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
                           initialDurationSeconds:(uint32_t)initialDurationSeconds

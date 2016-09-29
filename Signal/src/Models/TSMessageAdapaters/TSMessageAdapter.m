@@ -51,6 +51,8 @@
 // -- Redeclaring properties from OWSMessageData protocol to synthesize variables
 @property (nonatomic) TSMessageAdapterType messageType;
 @property (nonatomic, getter=isExpiringMessage) BOOL expiringMessage;
+@property (nonatomic) uint64_t expiresAtSeconds;
+@property (nonatomic) uint32_t expiresInSeconds;
 
 @property (nonatomic, copy) NSDate *messageDate;
 @property (nonatomic, retain) NSString *messageBody;
@@ -78,6 +80,8 @@
     if ([interaction isKindOfClass:[TSMessage class]]) {
         TSMessage *message = (TSMessage *)interaction;
         _expiringMessage = message.isExpiringMessage;
+        _expiresAtSeconds = message.expiresAt / 1000;
+        _expiresInSeconds = message.expiresIn;
     } else {
         _expiringMessage = NO;
     }

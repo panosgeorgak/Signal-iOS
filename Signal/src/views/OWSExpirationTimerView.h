@@ -7,7 +7,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface OWSExpirationTimerView : UIView
 
-- (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds initialDurationSeconds:(uint32_t)initialDurationSeconds;
+- (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
+                initialDurationSeconds:(uint32_t)initialDurationSeconds;
 - (void)endAnyTimer;
 
 @end
