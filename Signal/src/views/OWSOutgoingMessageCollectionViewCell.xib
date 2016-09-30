@@ -127,7 +127,8 @@
                 <outlet property="cellBottomLabelHeightConstraint" destination="cPs-M4-tjX" id="b5k-6e-iA8"/>
                 <outlet property="cellTopLabel" destination="jxM-YD-sVG" id="acH-pr-spx"/>
                 <outlet property="cellTopLabelHeightConstraint" destination="9oK-E7-iXA" id="MZM-kV-2dI"/>
-                <outlet property="expirationTimerView" destination="0tt-tR-3Iu" id="fZG-07-jwr"/>
+                <outlet property="expirationTimerView" destination="0tt-tR-3Iu" id="1Yp-Fs-DUh"/>
+                <outlet property="expirationTimerViewWidthConstraint" destination="5XO-l6-PgT" id="6md-KV-QkY"/>
                 <outlet property="messageBubbleContainerView" destination="2zh-vR-QJW" id="pu0-GU-eZl"/>
                 <outlet property="messageBubbleContainerWidthConstraint" destination="imD-52-K45" id="Xld-Pa-yJw"/>
                 <outlet property="messageBubbleImageView" destination="2qm-c6-OZf" id="bpy-Gv-jSh"/>

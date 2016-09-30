@@ -8,21 +8,33 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface OWSOutgoingMessageCollectionViewCell ()
 
-@property (nonatomic) IBOutlet OWSExpirationTimerView *expirationTimerView;
+@property (strong, nonatomic) IBOutlet OWSExpirationTimerView *expirationTimerView;
+@property (strong, nonatomic) IBOutlet NSLayoutConstraint *expirationTimerViewWidthConstraint;
 
 @end
 
 @implementation OWSOutgoingMessageCollectionViewCell
 
+
+// pragma mark - OWSExpirableMessageView
+
+- (void)awakeFromNib
+{
+    [super awakeFromNib];
+    self.expirationTimerViewWidthConstraint.constant = 0.0;
+}
+
 - (void)startExpirationTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
                           initialDurationSeconds:(uint32_t)initialDurationSeconds
 {
+    self.expirationTimerViewWidthConstraint.constant = 20.0f;
     [self.expirationTimerView startTimerWithExpiresAtSeconds:expiresAtSeconds
                                       initialDurationSeconds:initialDurationSeconds];
 }
 
 - (void)endAnyExpirationTimer
 {
+    self.expirationTimerViewWidthConstraint.constant = 0.0f;
     [self.expirationTimerView endAnyTimer];
 }
 

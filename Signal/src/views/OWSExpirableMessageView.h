@@ -7,7 +7,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @protocol OWSExpirableMessageView
 
-@property (nonatomic, readonly) IBOutlet OWSExpirationTimerView *expirationTimerView;
+@property (strong, nonatomic, readonly) IBOutlet OWSExpirationTimerView *expirationTimerView;
+@property (strong, nonatomic, readonly) IBOutlet NSLayoutConstraint *expirationTimerViewWidthConstraint;
 
 - (void)startExpirationTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
                           initialDurationSeconds:(uint32_t)initialDurationSeconds;

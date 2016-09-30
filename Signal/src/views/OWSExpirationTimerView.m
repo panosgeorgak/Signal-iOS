@@ -29,12 +29,12 @@ NS_ASSUME_NONNULL_BEGIN
     }
 }
 
-- (void)willMoveToWindow:(nullable UIWindow *)newWindow
+- (void)willMoveToWindow:(UIWindow *)newWindow
 {
-    //    if (!window) {
-    //        DDLogVerbose(@"%@ expiring timer since we're leaving view.");
-    //        [self endAnyTimer];
-    //    }
+    if (!newWindow) {
+        DDLogVerbose(@"%@ expiring timer since we're leaving view.", self.logTag);
+        [self endAnyTimer];
+    }
 }
 
 - (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds

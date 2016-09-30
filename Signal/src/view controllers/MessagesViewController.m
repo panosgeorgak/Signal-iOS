@@ -1137,12 +1137,6 @@ typedef enum : NSUInteger {
         [footer appendAttributedString:senderNameString];
     }
 
-    // Some right padding. This was copy/pasted. There might be a better way using insets.
-    NSTextAttachment *paddingAttachment = [NSTextAttachment new];
-    paddingAttachment.bounds = CGRectMake(0, 0, 11.0f, 10.0f);
-    NSAttributedString *paddingString = [NSAttributedString attributedStringWithAttachment:paddingAttachment];
-    [footer appendAttributedString:paddingString];
-
     return footer;
 }
 
