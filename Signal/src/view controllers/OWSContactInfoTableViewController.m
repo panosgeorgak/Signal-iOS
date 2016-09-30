@@ -6,6 +6,7 @@
 #import "FingerprintViewController.h"
 #import "OWSAvatarBuilder.h"
 #import "OWSContactsManager.h"
+#import "PhoneNumber.h"
 #import "UIUtil.h"
 #import <25519/Curve25519.h>
 #import <SignalServiceKit/NSDate+millisecondTimeStamp.h>
@@ -18,6 +19,8 @@
 #import <SignalServiceKit/TSMessagesManager.h>
 #import <SignalServiceKit/TSStorageManager.h>
 #import <SignalServiceKit/TSThread.h>
+
+NS_ASSUME_NONNULL_BEGIN
 
 @interface OWSContactInfoTableViewController ()
 
@@ -69,7 +72,7 @@ typedef enum {
     return self;
 }
 
-- (instancetype)initWithCoder:(NSCoder *)aDecoder
+- (nullable instancetype)initWithCoder:(NSCoder *)aDecoder
 {
     self = [super initWithCoder:aDecoder];
     if (!self) {
@@ -91,7 +94,10 @@ typedef enum {
     self.verifyPrivacyCell.hidden = self.hidePrivacyVerificationCell;
 
     self.nameLabel.text = self.contactName;
-    self.signalIdLabel.text = self.signalId;
+    if (self.signalId) {
+        self.signalIdLabel.text =
+            [PhoneNumber bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:self.signalId];
+    }
     self.avatar.image = [OWSAvatarBuilder buildImageForThread:self.thread contactsManager:self.contactsManager];
 
     self.verifyPrivacyCell.textLabel.text = NSLocalizedString(@"VERIFY_PRIVACY", @"settings table cell label");
@@ -108,6 +114,7 @@ typedef enum {
 
     self.disappearingMessagesConfiguration =
         [OWSDisappearingMessagesConfiguration fetchObjectWithUniqueID:self.thread.uniqueId];
+
     if (!self.disappearingMessagesConfiguration) {
         self.disappearingMessagesConfiguration =
             [[OWSDisappearingMessagesConfiguration alloc] initDefaultWithThreadId:self.thread.uniqueId];
@@ -128,6 +135,11 @@ typedef enum {
 - (void)viewWillDisappear:(BOOL)animated
 {
     [super viewWillDisappear:animated];
+
+    if (self.disappearingMessagesConfiguration.isNewRecord && !self.disappearingMessagesConfiguration.isEnabled) {
+        // don't save defaults, else we'll unintentionally save the configuration and notify the contact.
+        return;
+    }
 
     if (self.disappearingMessagesConfiguration.dictionaryValueDidChange) {
         [self.disappearingMessagesConfiguration save];
@@ -226,7 +238,7 @@ typedef enum {
 #pragma mark - Navigation
 
 // In a storyboard-based application, you will often want to do a little preparation before navigation
-- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(nullable id)sender
 {
     if ([segue.destinationViewController isKindOfClass:[FingerprintViewController class]]) {
         FingerprintViewController *controller = (FingerprintViewController *)segue.destinationViewController;
@@ -241,7 +253,8 @@ typedef enum {
 }
 
 // Called before the user changes the selection. Return a new indexPath, or nil, to change the proposed selection.
-- (NSIndexPath *)tableView:(UITableView *)tableView willSelectRowAtIndexPath:(NSIndexPath *)indexPath{
+- (nullable NSIndexPath *)tableView:(UITableView *)tableView willSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
     UITableViewCell* cell = [tableView cellForRowAtIndexPath:indexPath];
     if(cell.selectionStyle == UITableViewCellSelectionStyleNone){
         return nil;
@@ -262,3 +275,5 @@ typedef enum {
 }
 
 @end
+
+NS_ASSUME_NONNULL_END
