@@ -97,6 +97,9 @@ typedef enum {
     if (self.signalId) {
         self.signalIdLabel.text =
             [PhoneNumber bestEffortFormatPartialUserSpecifiedTextToLookLikeAPhoneNumber:self.signalId];
+    } else {
+        // Don't print anything for groups.
+        self.signalIdLabel.text = nil;
     }
     self.avatar.image = [OWSAvatarBuilder buildImageForThread:self.thread contactsManager:self.contactsManager];
 
