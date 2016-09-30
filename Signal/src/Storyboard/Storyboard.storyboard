@@ -1287,7 +1287,7 @@
                         <color key="backgroundColor" red="0.93725490199999995" green="0.93725490199999995" blue="0.95686274510000002" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <prototypes>
                             <tableViewCell clipsSubviews="YES" contentMode="scaleToFill" selectionStyle="none" indentationWidth="10" reuseIdentifier="ExistingDevice" rowHeight="72" id="XjV-oU-jSb" customClass="OWSDeviceTableViewCell">
-                                <rect key="frame" x="0.0" y="120" width="375" height="72"/>
+                                <rect key="frame" x="0.0" y="119.5" width="375" height="72"/>
                                 <autoresizingMask key="autoresizingMask"/>
                                 <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" tableViewCell="XjV-oU-jSb" id="XqL-QG-IbY">
                                     <frame key="frameInset" width="375" height="71"/>
@@ -1328,7 +1328,7 @@
                                 </connections>
                             </tableViewCell>
                             <tableViewCell clipsSubviews="YES" contentMode="scaleToFill" selectionStyle="default" accessoryType="disclosureIndicator" indentationWidth="10" reuseIdentifier="AddNewDevice" textLabel="w80-IJ-E6R" detailTextLabel="8ft-2u-wBF" style="IBUITableViewCellStyleSubtitle" id="6h2-gg-1C6">
-                                <rect key="frame" x="0.0" y="192" width="375" height="44"/>
+                                <rect key="frame" x="0.0" y="191.5" width="375" height="44"/>
                                 <autoresizingMask key="autoresizingMask"/>
                                 <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" tableViewCell="6h2-gg-1C6" id="RKi-c6-pzb">
                                     <frame key="frameInset" width="342" height="43"/>
