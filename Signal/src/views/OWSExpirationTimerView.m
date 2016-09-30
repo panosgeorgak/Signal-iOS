@@ -29,7 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
     }
 }
 
-- (void)willMoveToWindow:(UIWindow *)newWindow
+- (void)willMoveToWindow:(nullable UIWindow *)newWindow
 {
     if (!newWindow) {
         DDLogVerbose(@"%@ expiring timer since we're leaving view.", self.logTag);

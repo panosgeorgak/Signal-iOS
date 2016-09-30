@@ -106,9 +106,6 @@
                         <barButtonItem key="rightBarButtonItem" image="contact-options-action" id="662-pN-RLf">
                             <inset key="imageInsets" minX="17" minY="10" maxX="0.0" maxY="5"/>
                             <color key="tintColor" red="0.99987119436264038" green="0.99998223781585693" blue="0.99984109401702881" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                            <connections>
-                                <action selector="didSelectShow:" destination="DtA-8O-wrT" id="ktP-VG-5bo"/>
-                            </connections>
                         </barButtonItem>
                     </navigationItem>
                     <connections>
@@ -1826,7 +1823,7 @@
                             <tableView clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="prototypes" style="plain" separatorStyle="default" allowsMultipleSelection="YES" rowHeight="44" sectionHeaderHeight="22" sectionFooterHeight="22" translatesAutoresizingMaskIntoConstraints="NO" id="cFo-AT-Srf">
                                 <color key="backgroundColor" red="0.94901960780000005" green="0.94901960780000005" blue="0.94901960780000005" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                                 <view key="tableHeaderView" contentMode="scaleToFill" id="ekO-kw-iHV" userLabel="Header View">
-                                    <rect key="frame" x="0.0" y="0.0" width="1000" height="40"/>
+                                    <rect key="frame" x="0.0" y="0.0" width="375" height="40"/>
                                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                     <subviews>
                                         <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Add people:" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" minimumFontSize="9" translatesAutoresizingMaskIntoConstraints="NO" id="daD-wf-IGn">
@@ -1844,14 +1841,14 @@
                                 </view>
                                 <prototypes>
                                     <tableViewCell contentMode="scaleToFill" selectionStyle="gray" hidesAccessoryWhenEditing="NO" indentationLevel="1" indentationWidth="0.0" reuseIdentifier="GroupSearchCell" textLabel="a4j-OQ-ala" rowHeight="60" style="IBUITableViewCellStyleDefault" id="yfF-Jl-bZ1">
-                                        <rect key="frame" x="0.0" y="62" width="1000" height="60"/>
+                                        <rect key="frame" x="0.0" y="62" width="375" height="60"/>
                                         <autoresizingMask key="autoresizingMask"/>
                                         <tableViewCellContentView key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" tableViewCell="yfF-Jl-bZ1" id="f0v-od-N9K">
-                                            <frame key="frameInset" width="1000" height="59"/>
+                                            <frame key="frameInset" width="375" height="59"/>
                                             <autoresizingMask key="autoresizingMask"/>
                                             <subviews>
                                                 <label opaque="NO" multipleTouchEnabled="YES" contentMode="left" text="Title" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" id="a4j-OQ-ala">
-                                                    <frame key="frameInset" minX="164" width="672" height="59"/>
+                                                    <frame key="frameInset" minX="15" width="345" height="59"/>
                                                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                                     <fontDescription key="fontDescription" type="system" weight="medium" pointSize="20"/>
                                                     <color key="textColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
@@ -1946,7 +1943,7 @@
                         <viewControllerLayoutGuide type="bottom" id="w3c-y6-c5W"/>
                     </layoutGuides>
                     <view key="view" contentMode="scaleToFill" id="Z7D-4g-GIf">
-                        <rect key="frame" x="0.0" y="0.0" width="375" height="270"/>
+                        <rect key="frame" x="0.0" y="0.0" width="375" height="269.5"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     </view>
@@ -1981,8 +1978,8 @@
         <simulatedScreenMetrics key="destination" type="retina4_7.fullscreen"/>
     </simulatedMetricsContainer>
     <inferredMetricsTieBreakers>
-        <segue reference="gZ1-lh-srF"/>
-        <segue reference="wgA-Oo-kKq"/>
         <segue reference="xo7-5J-BJb"/>
+        <segue reference="tfr-ZV-qWs"/>
+        <segue reference="gZ1-lh-srF"/>
     </inferredMetricsTieBreakers>
 </document>

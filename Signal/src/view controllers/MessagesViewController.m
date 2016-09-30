@@ -110,7 +110,6 @@ typedef enum : NSUInteger {
 @property (nonatomic, strong) UILabel *navbarTitleLabel;
 @property (nonatomic, retain) UIButton *attachButton;
 @property (nonatomic, retain) NSIndexPath *lastDeliveredMessageIndexPath;
-//@property NSMutableDictionary<NSString *, NSTimer *> *disappearingMessagesAnimationTimers;
 
 @property NSUInteger page;
 @property (nonatomic) BOOL composeOnOpen;
@@ -323,6 +322,11 @@ typedef enum : NSUInteger {
 
     [self toggleObservers:YES];
 
+    OWSDisappearingMessagesConfiguration *configuration =
+        [OWSDisappearingMessagesConfiguration fetchObjectWithUniqueID:self.thread.uniqueId];
+    [self setBarButtonItemsForDisappearingMessagesConfiguration:configuration];
+    [self setNavigationTitle];
+
     NSInteger numberOfMessages = (NSInteger)[self.messageMappings numberOfItemsInGroup:self.thread.uniqueId];
     if (numberOfMessages > 0) {
         NSIndexPath *lastCellIndexPath = [NSIndexPath indexPathForRow:numberOfMessages - 1 inSection:0];
@@ -416,7 +420,8 @@ typedef enum : NSUInteger {
 #pragma mark - Initiliazers
 
 // Group update menu
-- (IBAction)didSelectShow:(id)sender {
+- (void)didTapManageGroupButton:(id)sender
+{
     if (isGroupConversation) {
         UIBarButtonItem *spaceEdge =
             [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFixedSpace target:nil action:nil];
@@ -515,6 +520,42 @@ typedef enum : NSUInteger {
     self.title = navTitle;
 }
 
+- (void)setBarButtonItemsForDisappearingMessagesConfiguration:
+    (OWSDisappearingMessagesConfiguration *)disappearingMessagesConfiguration
+
+{
+    NSMutableArray<UIBarButtonItem *> *barButtons = [NSMutableArray new];
+
+    if ([self canCall]) {
+        UIBarButtonItem *callButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"btnPhone--white"]
+                                                                       style:UIBarButtonItemStylePlain
+                                                                      target:self
+                                                                      action:@selector(callAction)];
+        callButton.imageInsets = UIEdgeInsetsMake(0, -10, 0, 10);
+        [barButtons addObject:callButton];
+    } else if ([self.thread isGroupThread]) {
+        UIBarButtonItem *manageGroupButton =
+            [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"contact-options-action"]
+                                             style:UIBarButtonItemStylePlain
+                                            target:self
+                                            action:@selector(didTapManageGroupButton:)];
+        // Hack to shrink button image
+        manageGroupButton.imageInsets = UIEdgeInsetsMake(10, 20, 10, 0);
+        [barButtons addObject:manageGroupButton];
+    } else {
+        DDLogError(@"Thread was neither group thread nor callable");
+    }
+
+    if (disappearingMessagesConfiguration.isEnabled) {
+        [barButtons addObject:[[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"ic_timer"]
+                                                               style:UIBarButtonItemStylePlain
+                                                              target:self
+                                                              action:@selector(didTapTimerInNavbar)]];
+    }
+
+    self.navigationItem.rightBarButtonItems = [barButtons copy];
+}
+
 - (void)initializeToolbars
 {
     // HACK JSQMessagesViewController doesn't yet support dynamic type in the inputToolbar.
@@ -526,29 +567,7 @@ typedef enum : NSUInteger {
     // while composing a long message.
     self.inputToolbar.maximumHeight = 300;
 
-    if ([self canCall]) {
-        self.navigationItem.rightBarButtonItem =
-            [[UIBarButtonItem alloc] initWithImage:[[UIImage imageNamed:@"btnPhone--white"]
-                                                       imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]
-                                             style:UIBarButtonItemStylePlain
-                                            target:self
-                                            action:@selector(callAction)];
-        self.navigationItem.rightBarButtonItem.imageInsets = UIEdgeInsetsMake(0, -10, 0, 10);
-    } else if ([self.thread isGroupThread]) {
-        self.navigationItem.rightBarButtonItem =
-            [[UIBarButtonItem alloc] initWithImage:[[UIImage imageNamed:@"contact-options-action"]
-                                                       imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]
-                                             style:UIBarButtonItemStylePlain
-                                            target:self
-                                            action:@selector(didSelectShow:)];
-        self.navigationItem.rightBarButtonItem.imageInsets = UIEdgeInsetsMake(10, 20, 10, 0);
-    } else {
-        self.navigationItem.rightBarButtonItem = nil;
-        DDLogError(@"Thread was neither group thread nor callable");
-    }
-
     [self hideInputIfNeeded];
-    [self setNavigationTitle];
 }
 
 - (void)setupTitleLabelGestureRecognizer
@@ -979,6 +998,12 @@ typedef enum : NSUInteger {
                                                              atIndexPath:(NSIndexPath *)indexPath
 {
     OWSDisplayedMessageCollectionViewCell *infoCell = [self loadDisplayedMessageCollectionViewCellForIndexPath:indexPath];
+
+    // HACK this will get called when we get a new info message, but there's gotta be a better spot for this.
+    OWSDisappearingMessagesConfiguration *configuration =
+        [OWSDisappearingMessagesConfiguration fetchObjectWithUniqueID:self.thread.uniqueId];
+    [self setBarButtonItemsForDisappearingMessagesConfiguration:configuration];
+
     infoCell.cellLabel.text = [infoMessage text];
     infoCell.cellLabel.textColor = [UIColor darkGrayColor];
     infoCell.messageBubbleContainerView.layer.borderColor = [[UIColor ows_infoMessageBorderColor] CGColor];
@@ -1152,11 +1177,23 @@ typedef enum : NSUInteger {
 
 #pragma mark - Actions
 
+- (void)showConversationSettings
+{
+    [self performSegueWithIdentifier:OWSMessagesViewControllerSeguePushConversationSettings sender:self];
+}
+
 - (void)didTapTitle
 {
     DDLogDebug(@"%@ Tapped title", self.tag);
-    [self performSegueWithIdentifier:OWSMessagesViewControllerSeguePushConversationSettings sender:self];
+    [self showConversationSettings];
 }
+
+- (void)didTapTimerInNavbar
+{
+    DDLogDebug(@"%@ Tapped navbar title", self.tag);
+    [self showConversationSettings];
+}
+
 
 - (void)collectionView:(JSQMessagesCollectionView *)collectionView
     didTapMessageBubbleAtIndexPath:(NSIndexPath *)indexPath
