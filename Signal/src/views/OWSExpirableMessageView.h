@@ -5,6 +5,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class OWSExpirationTimerView;
 
+static const CGFloat OWSExpirableMessageViewTimerWidth = 10.0f;
+
 @protocol OWSExpirableMessageView
 
 @property (strong, nonatomic, readonly) IBOutlet OWSExpirationTimerView *expirationTimerView;

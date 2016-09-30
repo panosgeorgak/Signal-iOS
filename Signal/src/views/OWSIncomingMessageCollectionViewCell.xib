@@ -85,9 +85,8 @@
                                 <nil key="highlightedColor"/>
                             </label>
                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="UYa-ee-mie" userLabel="Expiration Timer" customClass="OWSExpirationTimerView">
-                                <color key="backgroundColor" red="0.12549019610000001" green="0.56470588239999997" blue="0.91764705879999997" alpha="1" colorSpace="calibratedRGB"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="20" id="Spx-mv-2DX"/>
+                                    <constraint firstAttribute="width" constant="10" id="Spx-mv-2DX"/>
                                 </constraints>
                             </view>
                         </subviews>

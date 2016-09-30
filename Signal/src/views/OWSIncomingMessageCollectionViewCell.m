@@ -26,7 +26,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)startExpirationTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
                           initialDurationSeconds:(uint32_t)initialDurationSeconds
 {
-    self.expirationTimerViewWidthConstraint.constant = 20.0f;
+    self.expirationTimerViewWidthConstraint.constant = OWSExpirableMessageViewTimerWidth;
     [self.expirationTimerView startTimerWithExpiresAtSeconds:expiresAtSeconds
                                       initialDurationSeconds:initialDurationSeconds];
 }

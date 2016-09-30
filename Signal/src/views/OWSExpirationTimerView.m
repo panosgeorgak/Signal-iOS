@@ -2,6 +2,7 @@
 //  Copyright © 2016 Open Whisper Systems. All rights reserved.
 
 #import "OWSExpirationTimerView.h"
+#import "UIColor+OWS.h"
 #import <QuartzCore/CAShapeLayer.h>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -33,14 +34,18 @@ NS_ASSUME_NONNULL_BEGIN
         return self;
     }
 
+    self.clipsToBounds = YES;
+
     _emptyHourglassImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"ic_hourglass_empty"]];
+    _emptyHourglassImageView.tintColor = [UIColor ows_blackColor];
     [self insertSubview:_emptyHourglassImageView atIndex:0];
 
     _fullHourglassImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"ic_hourglass_full"]];
+    _fullHourglassImageView.tintColor = [UIColor ows_darkGrayColor];
     [self insertSubview:_fullHourglassImageView atIndex:1];
-    _fullHourglassImageView.clipsToBounds = YES;
 
     _ratioRemaining = 1.0f;
+
     return self;
 }
 
@@ -51,12 +56,15 @@ NS_ASSUME_NONNULL_BEGIN
         return self;
     }
 
+    self.clipsToBounds = YES;
+
     _emptyHourglassImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"ic_hourglass_empty"]];
-    [self insertSubview:_emptyHourglassImageView atIndex:0];
+    _emptyHourglassImageView.tintColor = [UIColor lightGrayColor];
+    [self insertSubview:_emptyHourglassImageView atIndex:1];
 
     _fullHourglassImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"ic_hourglass_full"]];
-    [self insertSubview:_fullHourglassImageView atIndex:1];
-    _fullHourglassImageView.clipsToBounds = YES;
+    _fullHourglassImageView.tintColor = [UIColor lightGrayColor];
+    [self insertSubview:_fullHourglassImageView atIndex:0];
 
     _ratioRemaining = 1.0f;
 
@@ -65,12 +73,17 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)layoutSubviews
 {
-    CGFloat leftMargin = 6.0f;
-    CGRect hourglassFrame = CGRectMake(leftMargin, 0, self.frame.size.height, self.frame.size.height);
+    CGFloat leftMargin = 0.0f;
+    CGFloat padding = 6.0f;
+    CGRect hourglassFrame
+        = CGRectMake(leftMargin, padding / 2, self.frame.size.height - padding, self.frame.size.height - padding);
     self.emptyHourglassImageView.frame = hourglassFrame;
+    self.emptyHourglassImageView.bounds = hourglassFrame;
     self.fullHourglassImageView.frame = hourglassFrame;
+    self.fullHourglassImageView.bounds = hourglassFrame;
 
-    CGFloat yOffset = (1 - self.ratioRemaining) * hourglassFrame.size.height;
+    // Offset the mask by the hourglass outline width so you can see the last tick.
+    CGFloat yOffset = (1 - self.ratioRemaining) * hourglassFrame.size.height - 1;
 
     // Lifted from http://stackoverflow.com/questions/11391058/simply-mask-a-uiview-with-a-rectangle
     // Create a mask layer and the frame to determine what will be visible in the view.
@@ -116,12 +129,11 @@ NS_ASSUME_NONNULL_BEGIN
     [self animateTimer];
 
     __weak typeof(self) wself = self;
-    self.animationTimer =
-        [NSTimer scheduledTimerWithTimeInterval:initialDurationSeconds / 16.0 // assumes a 10 step timer animation.
-                                         target:wself
-                                       selector:@selector(animateTimer)
-                                       userInfo:nil
-                                        repeats:YES];
+    self.animationTimer = [NSTimer scheduledTimerWithTimeInterval:initialDurationSeconds / 10.0 // 10 animation steps.
+                                                           target:wself
+                                                         selector:@selector(animateTimer)
+                                                         userInfo:nil
+                                                          repeats:YES];
 }
 
 - (void)animateTimer
