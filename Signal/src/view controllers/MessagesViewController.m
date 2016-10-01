@@ -76,6 +76,7 @@ static NSString *const OWSMessagesViewControllerSegueShowFingerprint = @"fingerp
 static NSString *const OWSMessagesViewControllerSegueShowGroupMembers = @"showGroupMembersSegue";
 static NSString *const OWSMessagesViewControllerSeguePushConversationSettings =
     @"OWSMessagesViewControllerSeguePushConversationSettings";
+NSString *const OWSMessagesViewControllerDidAppearNotification = @"OWSMessagesViewControllerDidAppear";
 
 typedef enum : NSUInteger {
     kMediaTypePicture,
@@ -321,6 +322,10 @@ typedef enum : NSUInteger {
     [super viewWillAppear:animated];
 
     [self toggleObservers:YES];
+
+    // restart any animations that were stopped e.g. while inspecting the contact info screens.
+    [[NSNotificationCenter defaultCenter] postNotificationName:OWSMessagesViewControllerDidAppearNotification
+                                                        object:nil];
 
     OWSDisappearingMessagesConfiguration *configuration =
         [OWSDisappearingMessagesConfiguration fetchObjectWithUniqueID:self.thread.uniqueId];

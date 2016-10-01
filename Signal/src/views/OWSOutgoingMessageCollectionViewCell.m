@@ -35,7 +35,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)endAnyExpirationTimer
 {
     self.expirationTimerViewWidthConstraint.constant = 0.0f;
-    [self.expirationTimerView endAnyTimer];
 }
 
 @end

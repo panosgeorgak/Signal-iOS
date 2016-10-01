@@ -9,7 +9,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
                 initialDurationSeconds:(uint32_t)initialDurationSeconds;
-- (void)endAnyTimer;
 
 @end
 

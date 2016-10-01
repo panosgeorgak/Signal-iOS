@@ -2,6 +2,7 @@
 //  Copyright © 2016 Open Whisper Systems. All rights reserved.
 
 #import "OWSExpirationTimerView.h"
+#import "MessagesViewController.h"
 #import "UIColor+OWS.h"
 #import <QuartzCore/CAShapeLayer.h>
 
@@ -10,7 +11,6 @@ NS_ASSUME_NONNULL_BEGIN
 @interface OWSExpirationTimerView ()
 
 @property (nonatomic) uint32_t initialDurationSeconds;
-@property (nonatomic) NSTimer *animationTimer;
 @property (atomic) uint64_t expiresAtSeconds;
 
 @property (nonatomic, readonly) UIImageView *emptyHourglassImageView;
@@ -20,12 +20,6 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @implementation OWSExpirationTimerView
-
-- (void)dealloc
-{
-    DDLogDebug(@"%@ invalidating old animation timer in dealloc", self.logTag);
-    [_animationTimer invalidate];
-}
 
 - (instancetype)initWithFrame:(CGRect)frame
 {
@@ -82,37 +76,11 @@ NS_ASSUME_NONNULL_BEGIN
     self.fullHourglassImageView.frame = hourglassFrame;
     self.fullHourglassImageView.bounds = hourglassFrame;
 
-    // Offset the mask by the hourglass outline width so you can see the last tick.
-    CGFloat yOffset = (1 - self.ratioRemaining) * hourglassFrame.size.height - 1;
-
-    // Lifted from http://stackoverflow.com/questions/11391058/simply-mask-a-uiview-with-a-rectangle
-    // Create a mask layer and the frame to determine what will be visible in the view.
-    CAShapeLayer *maskLayer = [[CAShapeLayer alloc] init];
-    CGRect maskRect = CGRectOffset(hourglassFrame, -leftMargin, yOffset);
-    // Create a path with the rectangle in it.
-    CGPathRef path = CGPathCreateWithRect(maskRect, NULL);
-    // Set the path to the mask layer.
-    maskLayer.path = path;
-    // Release the path since it's not covered by ARC.
-    CGPathRelease(path);
-
-    self.fullHourglassImageView.layer.mask = maskLayer;
 }
 
-- (void)endAnyTimer
+- (void)restartAnimation:(NSNotification *)notification
 {
-    if (self.animationTimer) {
-        DDLogDebug(@"%@ invalidating old animation timer", self.logTag);
-        [self.animationTimer invalidate];
-    }
-}
-
-- (void)willMoveToWindow:(nullable UIWindow *)newWindow
-{
-    if (!newWindow) {
-        DDLogVerbose(@"%@ expiring timer since we're leaving view.", self.logTag);
-        [self endAnyTimer];
-    }
+    [self startTimerWithExpiresAtSeconds:self.expiresAtSeconds initialDurationSeconds:self.initialDurationSeconds];
 }
 
 - (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
@@ -125,32 +93,47 @@ NS_ASSUME_NONNULL_BEGIN
 
     self.expiresAtSeconds = expiresAtSeconds;
     self.initialDurationSeconds = initialDurationSeconds;
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(restartAnimation:)
+                                                 name:OWSMessagesViewControllerDidAppearNotification
+                                               object:nil];
 
-    [self animateTimer];
-
-    __weak typeof(self) wself = self;
-    self.animationTimer = [NSTimer scheduledTimerWithTimeInterval:initialDurationSeconds / 10.0 // 10 animation steps.
-                                                           target:wself
-                                                         selector:@selector(animateTimer)
-                                                         userInfo:nil
-                                                          repeats:YES];
-}
-
-- (void)animateTimer
-{
     double secondsLeft = self.expiresAtSeconds - [NSDate new].timeIntervalSince1970;
 
     if (secondsLeft > INT_MAX) { // overflow
         secondsLeft = 0;
-        DDLogDebug(@"%@ Ending timer because time ran out.", self.logTag);
-        [self endAnyTimer];
     }
-
-    DDLogVerbose(@"%@ Animating timer with seconds left: %f", self.logTag, secondsLeft);
-    self.ratioRemaining = (CGFloat)secondsLeft / (CGFloat)self.initialDurationSeconds;
 
     [self setNeedsLayout];
     [self layoutIfNeeded];
+
+    CAGradientLayer *maskLayer = [CAGradientLayer new];
+    self.fullHourglassImageView.layer.mask = maskLayer;
+
+    maskLayer.frame = self.fullHourglassImageView.frame;
+
+    // Blur the top of the mask a bit with gradient
+    maskLayer.colors = @[ (id)[UIColor clearColor].CGColor, (id)[UIColor blackColor].CGColor ];
+    maskLayer.startPoint = CGPointMake(0.5, 0);
+    maskLayer.endPoint = CGPointMake(0.5, 0.2);
+
+    CGFloat ratioRemaining = ((CGFloat)secondsLeft / (CGFloat)self.initialDurationSeconds);
+    if (ratioRemaining < 0) {
+        ratioRemaining = 0.0;
+    }
+    CGPoint defaultPosition = maskLayer.position;
+    CGPoint finalPosition = CGPointMake(defaultPosition.x, defaultPosition.y + maskLayer.bounds.size.height);
+    CGPoint startingPosition
+        = CGPointMake(defaultPosition.x, finalPosition.y - maskLayer.bounds.size.height * ratioRemaining);
+    maskLayer.position = startingPosition;
+
+    CABasicAnimation *revealAnimation = [CABasicAnimation animationWithKeyPath:@"position"];
+    revealAnimation.duration = secondsLeft;
+    revealAnimation.fromValue = [NSValue valueWithCGPoint:startingPosition];
+    revealAnimation.toValue = [NSValue valueWithCGPoint:finalPosition];
+
+    [maskLayer addAnimation:revealAnimation forKey:@"revealAnimation"];
+    maskLayer.position = finalPosition; // don't snap back
 }
 
 #pragma mark - Logging
