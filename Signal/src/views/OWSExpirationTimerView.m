@@ -86,7 +86,13 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)startTimerWithExpiresAtSeconds:(uint64_t)expiresAtSeconds
                 initialDurationSeconds:(uint32_t)initialDurationSeconds
 {
-    DDLogDebug(@"%@ Starting animation timer with expiresAtSeconds: %llu initialDurationSeconds: %d",
+    if (expiresAtSeconds == 0) {
+        DDLogWarn(@"%@ Asked to animate expiration for message with expiresAtSeconds:0 intitialDurationSeconds:%u",
+            self.logTag,
+            initialDurationSeconds);
+    }
+
+    DDLogVerbose(@"%@ Starting animation timer with expiresAtSeconds: %llu initialDurationSeconds: %d",
         self.logTag,
         expiresAtSeconds,
         initialDurationSeconds);
